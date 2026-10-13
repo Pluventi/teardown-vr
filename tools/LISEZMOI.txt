@@ -1,0 +1,620 @@
+===============================================================================
+                         TEARDOWN VR  -  mod pour Quest 3
+===============================================================================
+
+Joue à Teardown en réalité virtuelle, comme un jeu VR natif :
+  - vraie 3D : les deux yeux montrent exactement le même instant du jeu
+  - visée et outil dans la main, laser de visée
+  - déplacement au joystick, rotation par crans ou fluide, roomscale
+  - panneau de réglages dans le jeu (et dans le casque)
+  - menus, chargements et pause affichés sur un grand écran virtuel
+
+-------------------------------------------------------------------------------
+1. CE QU'IL TE FAUT
+-------------------------------------------------------------------------------
+  - Teardown (version Steam 2.0.1)
+  - Un Quest 3 relié au PC avec Virtual Desktop (conseillé), Meta Horizon Link
+    ou SteamVR. Avec Virtual Desktop, garde le runtime "VDXR" (réglage par
+    défaut) : c'est le plus rapide. Au lancement du jeu, le mod trouve tout
+    seul où est le casque (Virtual Desktop ou Quest Link) : rien à régler
+    dans Windows.
+  - Un PC capable de faire tourner Teardown à environ 2 fois la fréquence du
+    casque (voir "Performances").
+
+-------------------------------------------------------------------------------
+2. INSTALLATION
+-------------------------------------------------------------------------------
+  1. Ferme Teardown.
+  2. Double-clique sur "Installer Teardown VR.exe" (il trouve le jeu tout
+     seul via Steam), choisis ta langue ("English" ou "Français"), puis
+     clique sur "Installer Teardown VR".
+     Si Windows affiche "Windows a protégé votre ordinateur" : clique sur
+     "Informations complémentaires", puis "Exécuter quand même" (Windows
+     l'affiche pour les petits programmes qu'il ne connaît pas encore).
+     Pour une mise à jour : même chose, avec la nouvelle version (tes
+     réglages sont gardés).
+  3. Lance Teardown, puis : Jouer > Gestionnaire de mods > liste "Intégré" >
+     "Teardown VR" > clique sur "Désactivé" pour l'activer.
+     (À faire une seule fois.)
+  4. L'affichage du jeu doit être en "Fenêtre sans bordure" ou "Fenêtre" : en
+     "Plein écran", le jeu dessine à la résolution de l'écran du PC (1920x1080
+     par exemple) et l'image est floue dans le casque. Le mod le remet tout
+     seul en "Fenêtre sans bordure" à chaque démarrage du jeu.
+
+  Langue : le mod (panneau de réglages, messages dans le casque) est dans la
+  langue choisie à l'installation (anglais par défaut). Tu peux la changer à
+  tout moment dans le panneau de réglages : onglet Affichage, première ligne
+  "Language / Langue". Le panneau change tout de suite.
+
+  Réglages de départ : une première installation démarre avec les réglages
+  conseillés pour un Quest 3 (qualité d'image "Native du casque", netteté au
+  loin "Maximum", netteté 100 %, fréquence du casque par défaut, particules
+  identiques dans les deux yeux...), réglés sur une carte graphique très
+  puissante. Sur un PC moins puissant, si ça saccade, baisse
+  "Qualité d'image" ("Très haute" ou "Haute") dans les réglages.
+  Une mise à jour garde tes propres réglages (TeardownVR.ini, dossier du
+  jeu). Le bouton "Réinitialiser tous les réglages" redonne ceux de départ.
+
+  Remarque : "Netteté au loin" (sauf "Celui du jeu") et "Particules
+  identiques pour les deux yeux" utilisent des shaders reconstruits à partir
+  de ceux du jeu, qui ne font pas partie du code source public. Dans une
+  version compilée à partir du code source public, le jeu garde son propre
+  anticrénelage et ses propres particules, et ces deux réglages ne changent
+  rien.
+
+-------------------------------------------------------------------------------
+3. JOUER
+-------------------------------------------------------------------------------
+  1. Mets le casque et connecte-le au PC : Virtual Desktop, ou Quest Link
+     (câble ou Air Link).
+  2. Lance Teardown (depuis le bureau Virtual Desktop ou depuis le PC).
+  3. Les menus s'affichent sur un écran virtuel : vise avec une manette,
+     gâchette = clic, B = retour. La main qui a cliqué en dernier garde le
+     pointeur (carré orange) ; l'autre main (petit carré gris) le prend
+     quand tu appuies sur sa gâchette en visant l'écran.
+  4. Lance un niveau : tu passes en VR immersive.
+
+  Si tu étais mal placé : maintiens le clic du joystick gauche (ou F8) pour
+  recentrer la vue.
+
+-------------------------------------------------------------------------------
+4. COMMANDES (main droite = main dominante, inversable en mode gaucher)
+-------------------------------------------------------------------------------
+  Gâchette droite ............ utiliser l'outil (avec la masse : un petit
+                               appui bref suffit pour un coup entier ; on
+                               peut aussi frapper directement avec sa tête)
+  Grip droit ................. attraper / porter un objet
+  Joystick droit gauche/droite tourner (fluide par défaut ; par crans dans
+                               Réglages > Confort)
+  Joystick droit haut/bas .... changer d'outil (dans la vue de l'avion de
+                               l'AC130 : zoomer / dézoomer). En tenant un
+                               objet (grip droit ou gauche) : l'éloigner
+                               (haut) ou le rapprocher (bas)
+  Clic joystick droit ........ afficher / cacher l'inventaire : celui du jeu
+                               (armes et outils, mods compris, rangés par
+                               groupe), une fenêtre qui flotte devant ta
+                               ceinture. Tourner la tête ne le bouge pas ;
+                               il te suit quand tu marches et quand tu te
+                               retournes vraiment (tout le corps). Regarde-
+                               le et vise un nom + gâchette pour prendre
+                               l'outil (un numéro de groupe : l'outil suivant
+                               du groupe). Longue liste : gâchette maintenue
+                               dessus, monte ou descends la main pour la faire
+                               défiler (comme sur un téléphone).
+                               Le déplacer : vise-le et serre le grip de
+                               cette main (le bouton qui attrape les objets),
+                               bouge la main, relâche : il reste là, même la
+                               prochaine fois (cadre jaune et petite
+                               vibration pendant que tu le tiens). Il reste
+                               affiché jusqu'au prochain clic. S'il est resté
+                               loin de ton regard (derrière toi), le clic le
+                               ramène à sa place autour de toi (droit devant,
+                               ou du côté où tu l'as posé) au lieu de le
+                               cacher.
+  A .......................... sauter
+  B .......................... lampe torche
+  Joystick gauche ............ se déplacer
+  Gâchette gauche (L2) ....... s'accroupir (tant qu'elle est appuyée) ; avec
+                               l'arme Total Overdose : tirer avec le pistolet
+                               gauche (voir "Armes doubles")
+  Y .......................... interagir (E) : monter dans un véhicule / en
+                               descendre
+  En véhicule ................ gâchette droite = accélérer, gâchette gauche =
+                               freiner puis reculer, joystick gauche = tourner
+                               (à moitié = tourner à moitié), A = frein à main,
+                               Y = descendre, grips = bras de l'engin (monter /
+                               descendre). La vue tourne avec le véhicule.
+  Grip gauche ................ attraper avec la main gauche, comme le grip
+                               droit : de loin, un objet visé par le laser
+                               gauche (à moins de 3 m, l'icône de main
+                               apparaît dessus) reste tenu à sa distance et
+                               suit ta main ; de près, un objet sous la main
+                               est pris dans la main. Relâcher = lâcher /
+                               lancer (voir "Main physique"). Avec l'arme
+                               Total Overdose : s'accroupir
+  Main gauche ................ ta main gauche et son avant-bras sont dessinés
+                               dans le jeu et suivent la manette. C'est une
+                               vraie main physique (comme Bonelabs) : elle
+                               s'arrête contre les murs et pousse ce qui
+                               bouge. Elle vise aussi les menus (réglages,
+                               inventaire, menus du jeu, pause) : la main qui
+                               a cliqué en dernier garde le pointeur ; l'autre
+                               le prend quand tu appuies sur sa gâchette en
+                               visant le menu (ce clic compte déjà).
+                               Elle a son laser, comme la main droite : il
+                               s'arrête sur les menus (réglages, inventaire,
+                               menu d'un mod) pour montrer ce que tu vises.
+  X .......................... carte du niveau en 3D (une maquette vue d'en
+                               haut : joystick gauche = se déplacer dessus,
+                               joystick droit haut/bas = zoom, gauche/droite =
+                               tourner autour, X = fermer)
+  Menu (appui court) ......... pause
+  Menu (appui long) .......... panneau de réglages Teardown VR
+  Clic joystick gauche maintenu  recentrer la vue
+  Clic joystick droit MAINTENU panneau des TOUCHES : toutes les touches du
+                               clavier et de la souris, comme sur PC (voir
+                               ci-dessous)
+  Clic joystick gauche court . touche rapide : la dernière touche utilisée
+                               dans le panneau des touches (ex. Q)
+
+  Au clavier : F10 = panneau de réglages, F8 = recentrer.
+
+  PANNEAU DES TOUCHES (clic joystick droit maintenu une demi-seconde ; en
+  véhicule un clic court suffit ; vise avec la manette droite)
+    - "Touches des mods" : les touches des mods actifs, trouvées toutes
+      seules dans leurs fichiers (même pour un mod installé demain). Ex. avec
+      AC130 Airstrike : Q = obus précédent, O = options, E = obus suivant
+      (déjà sur Y).
+    - "Clavier" : un clavier complet (AZERTY). Maj, Ctrl et Alt restent
+      enfoncées jusqu'au prochain appui.
+    - "Souris" : clic gauche / droit / molette, molette haut / bas, et le
+      joystick qui sert de souris.
+    - Gâchette sur une touche : appui court = la touche est appuyée ;
+      gâchette maintenue = la touche reste enfoncée ; gâchette maintenue en
+      glissant vers le haut ou le bas = la liste défile (comme sur un
+      téléphone).
+    - Ce panneau et celui des réglages sont des fenêtres qui flottent là où
+      elles s'ouvrent, devant toi : tourner la tête ne les bouge pas. Pour
+      en déplacer un : vise-le et serre le grip de cette main, bouge la
+      main, relâche (cadre orange pendant que tu le tiens). Il s'ouvrira
+      ensuite à cette distance et à cette hauteur, devant ton regard
+      (Réglages > Écran : "Distance et hauteur d'origine" pour revenir à la
+      place de départ).
+
+  CAMÉRA D'UN MOD (avion AC130, drone, tourelle...)
+    Quand un mod prend la caméra, le joystick gauche sert de souris pour
+    viser (le personnage ne marche plus pendant ce temps). Le joystick droit
+    garde la rotation, et haut / bas = molette : c'est le zoom de l'AC130
+    (haut = zoomer, bas = dézoomer ; joystick gardé poussé = zoom continu).
+    Zoomer rapproche la caméra du point visé, comme un drone qui avance : la
+    cible grossit (jusqu'à x16) sans aucune déformation, tu regardes autour de
+    toi normalement, le relief reste naturel et le viseur reste sur la cible.
+    La caméra s'arrête toujours avant le sol ou un mur. En sortant de la vue
+    de l'avion, la vue redevient normale (l'AC130 garde son niveau de zoom
+    pour la fois suivante). Réglable dans le panneau des touches, onglet
+    "Souris" (autre joystick, vitesse, "Toujours" ou "Jamais") ; le type de
+    zoom ("Rapprochement" ou "Loupe", l'ancien mode) se choisit et le zoom se
+    coupe dans les
+    réglages (Affichage, "Zoom des caméras de mods").
+
+  MENUS DES MODS À LA SOURIS (revolver THE EVERYTHING REVOLVER, météo de
+  Natural Phenomena, menu d'apparition d'objets...)
+    Quand un mod ouvre une fenêtre qu'on utilise à la souris, elle s'affiche
+    nette devant toi.
+    - Un menu (météo de Natural Phenomena : bouton "Natural Phenomena" du menu
+      pause ; menus d'objets...) s'ouvre comme une FENÊTRE FLOTTANTE posée dans
+      la pièce, droit devant ton regard, à 1 m. Elle ne bouge plus quand tu
+      tournes la tête : tu peux la regarder de côté, regarder le ciel au-dessus.
+      Si tu te retournes vraiment (ton regard reste plus de 10° à côté de la
+      fenêtre - et de la direction où tu regardais quand elle a été placée -
+      pendant une demi-seconde) ou si tu t'en éloignes, elle te suit
+      doucement et reprend sa place par rapport à ton regard (droit devant si
+      tu ne l'as pas déplacée) - jamais pendant que tu la vises ou que tu la
+      déplaces.
+    - La déplacer : serre le grip (le même bouton que pour attraper un objet)
+      en la visant, bouge la main, relâche. Elle reste où tu l'as lâchée, droite
+      et tournée vers toi, et ce menu se rouvrira à la même place par rapport à
+      ton regard. Mise sur le côté, elle y reste tant que tu regardes devant
+      toi, vers elle ou entre les deux. Si la fenêtre se sert du clic droit
+      (ou si on ne peut pas savoir si elle s'en sert), le grip de la main qui
+      la vise reste son clic droit : vise alors juste à côté de son bord (le
+      point devient bleu et ses coins sont marqués en bleu), ou serre le grip
+      de ton autre main en la visant. Si ta main libre touche un objet, son
+      grip attrape l'objet, pas la fenêtre. Sous le panneau des réglages ou
+      l'inventaire VR (toujours vus par-dessus), le grip prend ce panneau-là.
+    - Quand aucune manette ne vise la fenêtre flottante, le point disparaît
+      et la souris est "à côté" : tirer la gâchette en visant ailleurs =
+      cliquer à côté de la fenêtre (Natural Phenomena se ferme, comme sur
+      l'écran du PC) ; aucun bouton n'est cliqué par erreur, même si tu
+      gardes la gâchette appuyée en ramenant la visée sur la fenêtre.
+    - Si un autre mod ouvre aussi une fenêtre à la souris en même temps, les
+      deux restent devant ta tête, comme avant (une seule souris pour les
+      deux), tant que l'autre est ouverte. Un fond flou (UiBackgroundBlur)
+      n'est pas dessiné sur une fenêtre flottante.
+    - Le menu des balles du revolver (X l'ouvre / le ferme) s'ouvre droit
+      devant toi, à hauteur des yeux, comme si tu regardais tout droit - même
+      si tu baisses la tête vers ton arme à ce moment-là. L'anneau est dessiné
+      comme sur l'écran du PC : il ne suit plus ta main ni ton poignet. Il
+      reste à sa place dans la pièce quand tu tournes ou baisses la tête (ses
+      volets sur les côtés aussi) et te suit seulement quand tu te déplaces
+      (au joystick, ou à pied dès un pas). Le grip ne le déplace pas : il reste
+      le clic droit du revolver. Pour le remettre devant toi : ferme et rouvre
+      le menu (X). Réglages (Affichage) : "Roue du revolver devant moi" et
+      "Roue du revolver fixe dans la pièce" (décoché : au centre de ta vue,
+      comme avant).
+    Vise la fenêtre avec une manette, gauche OU droite : un point orange suit
+    la visée de la main qui a cliqué en dernier. Gâchette de cette main = clic
+    gauche ; garde-la appuyée pour glisser (revolver : prends une balle sur la
+    roue et lâche-la sur une chambre du barillet). Grip de cette main = clic
+    droit (revolver : vider une chambre). Pour passer à l'autre main, vise la
+    fenêtre avec elle et tire sa gâchette (la viser seulement ne suffit pas).
+    Tant que la fenêtre est ouverte, la gâchette gauche ne
+    fait plus s'accroupir. Réglages (Affichage) : "Menus des mods en fenêtre
+    flottante" (décoché : la fenêtre reste devant ta tête, comme avant),
+    "Taille des menus des mods", "Oublier les places des menus des mods",
+    "Distance des menus des mods".
+
+  MAIN PHYSIQUE (main gauche, ou droite en mode gaucher ; comme Bonelabs)
+    - Ta main libre est un vrai objet du jeu, aussi forte que ta main qui
+      tient la masse (même force, même poids). Elle ne traverse rien : contre
+      un mur ou une table, elle reste à la surface (ta main dessinée s'y
+      arrête, l'avant-bras suit) et glisse dessus. Elle pousse et traîne ce
+      qui bouge : une caisse part, un objet très lourd résiste. La manette
+      vibre seulement au vrai contact (choc, appui).
+    - Elle ne te pousse jamais et ne peut pas te coincer. Elle laisse passer
+      les tirs, l'outil que tu tiens et ce que le jeu attrape : elle devient
+      "fantôme" quand elle est devant ton arme ou dans ta ligne de visée
+      pendant que tu tires, que tu appuies sur Y (interagir) ou sur le grip
+      droit (attraper du jeu), et près de l'objet que le jeu
+      porte. Ailleurs elle reste solide : elle peut retenir une porte pendant
+      que tu tires de l'autre main.
+    - Attraper : pose la main sur un objet qui bouge (ou à moins de 8 cm) et
+      serre le grip gauche : il est dans ta main. Il la suit avec la force
+      d'un bras : un objet léger suit vite, un lourd suit lentement, trop
+      lourd (ou coincé) il glisse de ta main. Une porte tourne sur ses gonds.
+      Relâche le grip pour le lâcher ; fais le geste de lancer et relâche :
+      il part avec la vitesse de ta main. Tant que tu le tiens, tu le
+      traverses (il ne te pousse pas) ; lâché, il redevient solide pour toi
+      et pour ta main dès qu'il ne te touche plus.
+    - Attraper de loin (comme la main droite) : vise un objet avec le laser
+      de la main gauche. S'il peut être pris (à moins de 3 m, 10 tonnes au
+      plus), il est entouré de blanc, le laser s'éclaire et l'icône de main
+      du jeu apparaît au point visé. Serre le grip gauche : tu le tiens là où
+      tu l'as pris, à sa distance (même tout près), au bout du laser ;
+      joystick droit haut / bas : plus loin / plus près ; il suit ta main (tourne
+      le poignet : il tourne autour d'elle) et te traverse sans te pousser.
+      Un objet lourd suit plus lentement ; bloqué loin du bout du laser, il
+      est lâché. Relâche le grip pour le lâcher ; fais le geste de lancer et
+      relâche : il part avec sa vitesse.
+    - Grip gauche = attraper, toujours (comme le grip droit). Rien sous la
+      main ni au bout du laser : il ne se passe rien ; relâche, puis resserre
+      le grip près de l'objet. S'accroupir : gâchette gauche (L2), même en
+      tenant un objet. Pour ramasser au sol, vise l'objet avec le laser,
+      accroupis-toi (gâchette gauche) ou baisse-toi pour de vrai.
+    - Le grip droit attrape toujours comme le jeu (au laser). S'il prend
+      l'objet que tient ta main gauche, elle le lâche.
+    - Réglages > Contrôles : "Main physique (comme Bonelabs)" et "... attraper
+      avec le grip" (décochés : la main traverse tout, le grip gauche fait
+      s'accroupir comme la gâchette gauche) ; "Laser de la main gauche"
+      (décoché : pas de
+      laser gauche, et pas d'attrape de loin).
+
+  ARMES DOUBLES (l'arme de mod "Total Overdose", deux pistolets)
+    Quand tu prends Total Overdose, tu as un pistolet dans CHAQUE main (et non
+    plus les deux dans la main droite) :
+      Gâchette droite (R2) ...... tire avec le pistolet de la main droite
+      Gâchette gauche (L2) ...... tire avec le pistolet de la main gauche
+      Grip gauche ............... s'accroupir (tant qu'il est serré) : ta main
+                                  gauche tient une arme, elle n'attrape rien
+      Grip droit ................ rien (sur PC, le clic droit lance l'esquive
+                                  du mod, une roulade au sol vue de l'extérieur,
+                                  désagréable en VR : elle est coupée)
+    Chaque balle part du canon de son pistolet, vers le point visé par le
+    laser de cette main (le laser gauche est toujours là avec cette arme ; si
+    tu l'as coupé, une petite croix montre le point visé). Un appui = un tir,
+    comme deux vraies armes ; appuie vite des deux côtés, les tirs s'enchaînent.
+    La manette qui tire vibre, et chaque pistolet a son recul.
+    - Si ta main gauche tient déjà un objet quand tu prends l'arme (ou si sa
+      manette n'est plus suivie), le pistolet gauche est caché et la gâchette
+      gauche ne fait rien jusqu'à ce que tu le lâches.
+    - Pendant que le grip droit porte un objet, la gâchette gauche ne tire
+      pas (le jeu lancerait l'objet).
+    - En mode gaucher, les deux grips sont inversés : grip droit = s'accroupir,
+      grip gauche = rien (et ce qui est dit ici de la main gauche
+      vaut pour la droite). Chaque gâchette tire toujours avec le pistolet de
+      sa main.
+    - Réglages > Contrôles : "Armes doubles : une arme dans chaque main (Total
+      Overdose)" (coché). Décoché : les deux pistolets dans la main droite,
+      tirés l'un après l'autre par la gâchette droite, gâchette gauche =
+      s'accroupir, comme avant.
+
+-------------------------------------------------------------------------------
+5. RÉGLAGES (appui long sur Menu, ou F10)
+-------------------------------------------------------------------------------
+  Tout est enregistré automatiquement dans TeardownVR.ini (dossier du jeu).
+
+  Affichage
+    - Language / Langue (première ligne) : "English" ou "Français". Le
+      panneau change tout de suite.
+    - Qualité d'image (résolution) : de "Basse" à "Native du casque (Quest 3)"
+      (3024 x 3264 par œil, la résolution conseillée par Virtual Desktop ;
+      réglage de départ).
+      Plus c'est haut, plus le lointain est net. Le jeu lit ce réglage au
+      démarrage : redémarre Teardown pour appliquer.
+    - Champ de vision couvert : 100 % = toute la vue. Moins = le jeu ne
+      dessine que le centre de la vue : le tour devient noir, ce qui reste
+      garde sa taille et sa forme (pas de zoom). Le jeu calcule une image
+      plus petite d'autant, aussi nette : plus fluide. Le bord noir change
+      tout de suite, le gain de performance vient au prochain lancement du
+      jeu.
+    - Résolution envoyée au casque, fréquence du casque.
+    - Stéréo : "Synchronisée" (recommandé, vraie 3D) ou "Yeux alternés"
+      (secours, si une mise à jour du jeu casse le mode synchronisé).
+    - Image nette par œil (recommandé) : chaque œil garde son propre
+      anticrénelage, sinon l'image est floue.
+    - Champ de vision exact par œil : chaque œil rend exactement ce que le
+      casque affiche (plus large vers l'extérieur que vers le nez), sans
+      pixels perdus.
+    - Netteté au loin : remplace l'anticrénelage du jeu, qui rend le lointain
+      flou dans un casque (la tête bouge toujours un peu). "Maximum" (réglage
+      de départ) : le plus net ; si les contours lointains scintillent trop à
+      ton goût, prends "Naturel" (détail lointain gardé, sans effet de
+      sur-netteté ni damier sur le verre) ou "Très net" (un peu plus de
+      détail, léger liseré sur les contours). "Net (doux)" lisse davantage.
+      "Celui du jeu" pour comparer. Immédiat.
+    - Retirer la brume au loin : enlève la brume du niveau pendant la VR
+      (le lointain est plus net et moins délavé). Décoché par défaut : la
+      brume du niveau et de la météo (pluie, neige) fait partie de
+      l'ambiance.
+    - Retirer le halo lumineux (bloom) : le jeu étale la lumière du ciel en un
+      halo qui voile les objets lointains comme un flou. Coché par défaut.
+    - Retirer le flou de profondeur : jamais de flou "caméra de cinéma".
+    - Particules identiques pour les deux yeux (pluie, fumée) : la pluie, la
+      fumée (extincteur, explosions), le feu et la poussière sont dessinés en
+      petits points serrés que l'image lisse ensuite. Avant, chaque œil voyait
+      d'autres points sur la même fumée, que le cerveau ne peut pas fusionner
+      (scintillement, fatigue des yeux). Coché (par défaut) : les deux yeux
+      voient les mêmes points, au même endroit de chaque particule, éclairés
+      du même côté, avec le même grain de lumière (ombre douce, soleil) ;
+      l'œil gauche ne change pas. Immédiat.
+    - Fumée qui bouge : même lissage dans les deux yeux : le jeu lisse la
+      fumée d'une image à l'autre en suivant le mouvement de chaque
+      particule. Avant, l'œil droit ne voyait jamais ce mouvement (sa fumée
+      traînait et était lissée autrement). Coché (par défaut) : l'œil droit
+      suit le vrai mouvement de la fumée, comme l'œil gauche. Immédiat.
+    - Fluidité :
+        "Objets des mods au même endroit dans les deux yeux" : certains mods
+        avancent leurs objets d'un pas fixe à chaque calcul (l'avion de
+        l'AC130 : 15 cm). L'œil droit le voyait plus loin que l'œil gauche,
+        comme dédoublé. Coché : les deux yeux voient chaque objet au même
+        endroit.
+        "Particules synchronisées entre les yeux" : la fumée, les étincelles
+        et les débris sont calculés en même temps que le reste du jeu ; les
+        deux yeux les voient au même endroit (avant : jusqu'à 10 cm d'écart
+        pendant les explosions).
+        "Pas de rattrapage après une saccade" : après une image en retard, le
+        jeu ne calcule plus deux pas de physique d'un coup (ce qui provoquait
+        des saccades en chaîne pendant les grosses explosions) ; il ralentit
+        imperceptiblement à la place.
+    - Netteté (filtre) : 0 = image telle que le jeu la calcule, 1 = le plus
+      net (réglage de départ).
+    - Netteté, luminosité, écart entre les yeux, échelle du monde, HUD, laser.
+    - Zoom des caméras de mods (coché par défaut) : quand un mod zoome en
+      réduisant son champ de vision (vue de l'avion de l'AC130 : joystick
+      droit haut / bas), ce que tu vises grossit dans le casque, jusqu'à x16.
+      Un champ de vision de 60° ou plus reste en taille réelle. Décoché : la
+      vue d'un mod n'est jamais agrandie.
+      Type de zoom : "Rapprochement" (recommandé) avance la caméra vers le
+      point visé, sans aucune déformation. "Loupe" (ancien mode) agrandit
+      l'image : ses bords se déforment quand on tourne la tête (effet
+      fisheye) et le relief paraît plat.
+    - Viseurs des mods sur la visée de la manette : le viseur qu'une arme de
+      mod dessine au centre de l'écran (logo du portal gun, viseur du
+      chaingun...) est placé sur le point visé par le laser, à sa distance,
+      au lieu de rester devant tes yeux. Le reste du HUD ne bouge pas.
+      (Réglage visible quand « HUD au centre de la vue » est coché.)
+    - Menus des mods à la manette (coché), "Menus des mods en fenêtre
+      flottante" (coché), leur taille et leur distance (1 m) : voir
+      « Menus des mods à la souris » plus haut.
+  Confort
+    - Rotation par crans (angle) ou fluide (vitesse), direction et vitesse
+      de déplacement, roomscale, taille réelle ou taille du personnage,
+      décalage de hauteur, vignette anti-nausée, bouton "Recentrer".
+  Contrôles
+    - Bras de la main libre (dessiné ou non), avec "Main physique (comme
+      Bonelabs)" et "... attraper avec le grip" (voir "Main physique" plus
+      haut) ; les deux mains pointent les menus (sinon seulement la main qui
+      tient l'outil) ; laser de la main gauche (coché).
+    - Mode gaucher, viser avec la manette ou la tête, vibrations, position
+      et inclinaison de l'outil dans la main.
+    - Armes doubles (coché) : avec Total Overdose, un pistolet dans chaque
+      main (voir "Armes doubles" plus haut).
+    - Inventaire : hauteur, distance et côté (ou déplace-le directement au
+      grip, voir "Clic joystick droit"), "Il me suit quand je me retourne"
+      (coché : quand tu te retournes vraiment, tourné de plus de 55°
+      pendant plus d'une seconde, il revient devant toi ; un coup d'œil sur
+      le côté ne le bouge pas), bouton "Remettre l'inventaire devant la
+      ceinture".
+    - Masse physique : la tête de la masse casse ce qu'elle touche, dans tous
+      les sens, avec la solidité de la masse du jeu (bois, plâtre, verre...
+      pas le métal ni le béton). Plus le coup est rapide, plus le trou est
+      grand. La gâchette donne toujours le coup normal du jeu.
+    - Masse : un petit appui = un coup (coché) : avec la masse en main, un
+      appui léger et bref sur la gâchette donne un coup entier du jeu, qui
+      casse ce que vise le laser jusqu'à 3 m comme dans le jeu de base ; pas
+      besoin de garder la gâchette enfoncée. Décoché : il faut appuyer
+      franchement, comme pour les armes.
+    - Les outils touchent les objets + Outil physique (comme Bonelabs) :
+      l'outil en main (masse, armes, extincteur...) est un vrai objet physique,
+      tenu par ta main avec la force d'un bras. Il ne traverse rien : il
+      s'arrête contre les murs, glisse sur les surfaces, pousse, traîne ou
+      soulève ce qui bouge (un objet lourd résiste et l'outil se décale dans
+      ta main). La manette vibre seulement au vrai contact (choc, appui) ;
+      l'outil suit ta main sans traîner ni trembler, même quand le jeu rame.
+      S'il reste coincé loin de ta main, il y revient. Pendant que tu tires
+      (gâchette) ou que tu portes un objet, il ne bloque pas les tirs ni
+      l'objet porté.
+      Sans "Outil physique" : l'ancien mode (l'outil traverse en poussant, ou
+      s'arrête à la surface).
+    - Taille des armes de mods : les mods dessinent leurs armes pour un écran
+      de PC, loin devant la caméra ; tenues à la main elles paraissaient
+      énormes (un revolver de 1,5 m). Chaque arme de mod, même installée plus
+      tard, est réduite toute seule à la taille qu'elle a à l'écran (au plus
+      1,1 m de long). 100 % = cette taille automatique ; règle plus petit ou
+      plus grand à ton goût. Les tirs, éclairs et rayons partent du bout du
+      canon de l'arme réduite, et ses mouvements (recul...) sont à sa taille.
+  Écran
+    - Distance et taille de l'écran virtuel, mode cinéma (toujours sur
+      l'écran, sans 3D), taille du panneau de réglages en VR, distance et
+      hauteur où il s'ouvre (retenues quand tu le déplaces au grip), bouton
+      "Distance et hauteur d'origine".
+    - "Menu pause en 16:9 (comme sur l'écran du PC)" (coché par défaut) : en
+      pause dans un niveau, l'écran virtuel a la forme d'un écran de PC et le
+      menu pause y est disposé comme sur le PC (avant : un écran presque
+      carré). Décoché : comme avant.
+  Infos
+    - État du casque, du mod, images par seconde, réinitialisation.
+    - Casque utilisé : "Automatique (détection)" par défaut. Au lancement du
+      jeu, le mod prend celui qui a le casque : Virtual Desktop ou Meta Quest
+      Link (les deux connectés : celui choisi dans Windows). La ligne
+      "Détection" dit lequel. Un casque connecté après le lancement est
+      trouvé aussi. Tu peux aussi imposer Virtual Desktop, Meta Quest Link,
+      SteamVR ou "Celui choisi dans Windows" (au prochain lancement du jeu).
+
+-------------------------------------------------------------------------------
+6. PERFORMANCES
+-------------------------------------------------------------------------------
+  Pour que les deux yeux voient le même instant, le jeu calcule l'œil gauche
+  puis l'œil droit à la suite (le temps du jeu est figé pour le 2e œil).
+  Il faut donc environ 2 images du jeu par image du casque :
+      72 Hz dans le casque  ->  viser ~144 images/s dans le jeu
+  Si ça saccade :
+    - choisis 72 Hz dans "Fréquence du casque"
+    - baisse les options graphiques de Teardown (ombres, réflexions...)
+    - baisse "Résolution de rendu du jeu" ou "Résolution envoyée au casque"
+  Le casque (Virtual Desktop / Link) comble les images manquantes, mais c'est
+  plus agréable quand le jeu suit.
+
+  Ce que le mod fait tout seul pour la fluidité (rien à régler, l'image
+  dans le casque ne change pas) :
+    - pendant la VR, le jeu passe en priorité "supérieure à la normale" dans
+      Windows (jamais plus haut : Virtual Desktop reste prioritaire) ; elle
+      redevient normale quand la VR s'arrête ;
+    - le journal TeardownVR.log s'écrit en arrière-plan, sans freiner le jeu ;
+    - le mod évite de refaire deux fois certains calculs (armes de mods,
+      objets qui bougent, script Lua du mod) ;
+    - "Optimisation du processeur" (onglet Affichage, cochée par défaut) :
+      l'œil droit est seulement dessiné (le jeu ne refait pas tous ses
+      calculs une 2e fois), et le processeur prépare l'œil droit pendant que
+      la carte graphique dessine encore le gauche (avant, chacun attendait
+      l'autre), et l'image suivante commence ses calculs (scripts, physique)
+      sans attendre que la carte graphique ait fini la précédente.
+      Mesuré : ~40 % de temps en moins par image au calme, et pendant les
+      grosses explosions ~35-45 % d'images ratées et ~50 % de saccades en
+      moins. Même image. Décoche-la pour comparer avec l'ancien
+      fonctionnement.
+    - avec "Retirer le halo lumineux" et "Retirer le flou de profondeur"
+      cochés, le jeu ne calcule plus ces deux effets pour rien (avant, il les
+      calculait puis les multipliait par zéro) : ~0,6 ms de carte graphique
+      gagnée par image du casque, image identique au pixel près (vérifiée
+      toutes les 5 secondes ; à la moindre différence, ça se coupe tout seul).
+  Ce qui reste pendant les plus grosses explosions : le moteur du jeu
+  calcule chaque tas de débris d'un seul bloc sur un seul cœur du
+  processeur, et la carte graphique dessine alors chaque œil en ~6 ms. Le
+  découper changerait la physique du jeu : le mod ne le fait pas.
+  Conseils :
+    - coupe l'overlay Steam pour Teardown (Steam > Teardown > Propriétés >
+      décocher "Activer l'overlay Steam en jeu") et, avec une carte NVIDIA,
+      l'overlay NVIDIA et le "Replay instantané" (application NVIDIA, Alt+Z).
+      S'ils sont chargés dans le jeu, le bas du panneau de réglages l'écrit
+      en orange ("Overlay ... actif").
+    - ferme Chrome et les autres programmes lourds pendant que tu joues
+      (Chrome prenait presque un cœur du processeur pendant la VR).
+    - dans TeardownVR.ini, laisse debugLua=0 : debugLua=1 ne sert qu'au
+      diagnostic (mesures dans le journal) et coûte un peu de calcul. De même,
+      perfTrace=1 ou 2 (section [Debug]) écrit des mesures détaillées : à
+      mettre seulement pour mesurer toi-même les performances.
+
+  Image plus nette avec Virtual Desktop (dans l'appli VD du casque,
+  onglet Streaming) :
+    - "VR Graphics Quality" : Ultra ou Godlike
+    - "Video codec" : AV1 10 bits (cartes RTX 40/50), vers 200 Mbit/s.
+      Essayé avec une carte haut de gamme + Quest 3 : AV1 10 bits à 200 Mbit/s
+      est plus stable que H.264+ à 500 Mbit/s, qui saccadait. AV1 compresse
+      environ deux fois mieux : 200 en AV1 vaut à peu près 400 en H.264, avec
+      beaucoup moins de données à faire passer par le Wi-Fi. Si ça saccade
+      encore, baisse le débit (150) plutôt que de le monter.
+      Pourquoi H.264+ à 500 Mbit/s saccade : chaque image pèse alors ~5,6
+      Mbit, et pendant les explosions ou au chargement d'un niveau ces images
+      ne passent plus à temps par le Wi-Fi (ou le casque met trop de temps à
+      les décoder) ; Virtual Desktop retient alors le jeu. Le journal
+      TeardownVR.log compte ces retenues ("runtime holds"). Le jeu ne peut pas
+      empêcher le Wi-Fi de bloquer, mais depuis le 12/10/2026 il reprend
+      exactement là où il s'était arrêté (case "Reprise sans saut après un
+      blocage du streaming", cochée par défaut) : plus de saut en avant des
+      objets ni de double calcul de physique après chaque blocage. Pour
+      supprimer les blocages eux-mêmes en H.264+ : "Video buffering" activé
+      dans l'appli VD (le casque garde une image d'avance, ~11 ms de latence
+      en plus), ou un débit plus bas.
+    - "Sharpening" : à ton goût (VD ajoute sa propre netteté)
+  La "légère compression" visible vient de la diffusion sans fil : plus de
+  débit = moins de compression, mais un débit trop haut pour le Wi-Fi fait
+  saccader (Virtual Desktop retient alors les images).
+
+  Un autre programme qui utilise la carte graphique (calcul d'IA, autre jeu,
+  logiciel de rendu...) fait tomber le jeu à 15-20 images/s. Le mod le
+  détecte : un bandeau orange s'affiche dans le casque pendant 10 secondes
+  avec le nom du programme, et l'onglet Infos le liste. Ferme-le ou mets-le
+  en pause (c'était la cause des 20 FPS du 10/10/2026).
+
+  Grosses saccades par moments (fumée, destructions) : voir "Fluidité" dans
+  l'onglet Affichage (cochés par défaut). Le reste vient de la carte
+  graphique à fond : Virtual Desktop met alors le jeu en attente. Garde de la marge : une
+  qualité d'image moins haute ("Très haute" plutôt que "Ultra"), et coupe
+  l'overlay Steam pour Teardown (Steam > Teardown > Propriétés > décocher
+  "Activer l'overlay Steam en jeu"), qui ajoute de l'attente à chaque image.
+
+  Petit arrêt d'environ 0,1 seconde toutes les 15-20 secondes, même sans
+  bouger : il vient de la diffusion sans fil de Virtual Desktop, pas du jeu
+  (mesuré le 11/10/2026 : il arrive aussi dans le menu, et la carte graphique
+  n'est pas à fond). Dans l'appli VD du casque, essaie un débit ("Bitrate")
+  plus bas que le maximum conseillé plus haut, ou un autre codec (AV1 sur les
+  cartes RTX 40/50, ou HEVC 10 bits), et garde le casque près du routeur Wi-Fi
+  (5 ou 6 GHz), sans mur entre les deux.
+
+-------------------------------------------------------------------------------
+7. PROBLÈMES
+-------------------------------------------------------------------------------
+  - Rien dans le casque : Virtual Desktop doit être connecté AVANT le niveau.
+  - Image floue / "Image en basse résolution" dans le casque : le jeu a été
+    lancé avant que le casque soit connecté (la résolution VR n'est choisie
+    qu'au lancement du jeu). Connecte le casque (Virtual Desktop ou Quest
+    Link), puis relance Teardown.
+    Onglet Infos du panneau : "Casque non détecté" = le runtime OpenXR ne
+    répond pas.
+  - "Mod Lua : pas de réponse" : le mod n'est pas activé (étape 2.3) ou n'est
+    pas dans le dossier "mods\teardownvr" du jeu. Relance "Installer
+    Teardown VR.exe".
+  - Après une mise à jour de Teardown, si l'onglet Infos indique "Stéréo
+    synchronisée : indisponible", le mod repasse en yeux alternés.
+  - Journaux : lance "Installer Teardown VR.exe" et clique sur "Préparer mes
+    journaux". Un fichier TeardownVR_journaux_<date>.zip apparaît sur ton
+    Bureau. Il contient les journaux du mod, tes réglages VR et la
+    description de ton PC (Windows, processeur, mémoire, carte graphique) ;
+    rien n'est envoyé automatiquement. Les journaux de tes 10 dernières parties sont aussi
+    gardés dans le dossier du jeu, dans "TeardownVR_journaux" (la partie en
+    cours ou la dernière : TeardownVR.log, à côté).
+
+-------------------------------------------------------------------------------
+8. DÉSINSTALLER
+-------------------------------------------------------------------------------
+  Lance "Installer Teardown VR.exe" et choisis "Désinstaller Teardown VR".
+  Le jeu redevient normal (tes réglages TeardownVR.ini sont gardés,
+  supprime-les si tu veux).
+
+-------------------------------------------------------------------------------
+Teardown VR est un mod de fan gratuit et non officiel, fourni tel quel, sans
+garantie et sans assistance. Une mise à jour de Teardown peut le casser à tout
+moment ; aucune correction ni mise à jour n'est promise. Il n'est ni lié à
+Tuxedo Labs, ni approuvé par ce studio. Code source (GPL-3.0) : son adresse
+est dans LICENCES.txt, fourni avec l'installateur.

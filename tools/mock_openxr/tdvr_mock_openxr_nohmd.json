@@ -1,0 +1,7 @@
+{
+    "file_format_version": "1.0.0",
+    "runtime": {
+        "name": "TDVR Mock Headset, no headset (test only: the mod's headset detection)",
+        "library_path": "./tdvr_mock_openxr.dll"
+    }
+}

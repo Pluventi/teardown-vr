@@ -1,0 +1,161 @@
+# Release: builds the public version on GitHub's own Windows machines, from this repository's source only (without
+# the game-derived shaders), and publishes it as a GitHub Release with:
+#   - the files Teardown-VR.zip (what players download: the installer, README.txt, LISEZMOI.txt, LICENCES.txt),
+#     Teardown-VR-Installer.exe (the same installer on its own), dsound.dll (the mod alone) and LICENCES.txt.
+#     (GitHub turns the spaces of a release file's name into dots, so the published names have none; the files
+#     inside the zip keep their names.)
+#   - SHA-256 checksums of every released file (SHA256SUMS.txt, also in the release notes);
+#   - a build provenance attestation: anyone can check that a file was built by this workflow from this repository
+#     ("gh attestation verify <file> --repo <owner>/<repository>");
+#   - VirusTotal links, when the repository has a VT_API_KEY secret (a free VirusTotal account's API key): the
+#     installer and the DLL are uploaded for scanning. Without that secret this step is skipped, and a VirusTotal
+#     failure never stops the release.
+# Start it by pushing a tag (git tag v1.0.0, then git push origin v1.0.0), or from the Actions tab: "Run workflow",
+# then under "Use workflow from" choose the tag (Tags tab), not a branch. The release always gets the tag of the
+# commit that was built. Only GitHub's own actions are used, each pinned to an exact commit.
+# Two jobs: "build" runs the build scripts with read-only access and no secret; "publish" runs none of them and
+# alone can create the release, sign the attestation and use the VirusTotal key.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions: {}          # (each job asks for what it needs)
+
+jobs:
+  build:
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check that this run is for a version tag
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -ne 'tag' -or $env:TAG -cnotmatch '^v[0-9]+(\.[0-9]+){1,2}(-[0-9A-Za-z.]+)?$') {
+            Write-Host "::error::Run this workflow for a version tag such as v1.0.0: push the tag, or in 'Run workflow' choose the tag (Tags tab) under 'Use workflow from', not a branch. This run is for $env:GITHUB_REF."
+            exit 1
+          }
+
+      - name: Check out the source and the submodules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false   # (no later step needs git credentials)
+
+      - name: Build the mod, the installer and the zip (no game-derived shaders)
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\package_release.ps1 `
+            -RepoUrl "${{ github.server_url }}/${{ github.repository }}" -OutDir dist
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # (release\ holds exactly the files to publish, under names without spaces: the checksums, the attestation
+          #  and the upload all take this folder)
+          New-Item -ItemType Directory release | Out-Null
+          Copy-Item 'dist\Teardown VR.zip' release\Teardown-VR.zip
+          Copy-Item 'dist\Installer Teardown VR.exe' release\Teardown-VR-Installer.exe
+          Copy-Item dist\LICENCES.txt release\LICENCES.txt
+          Copy-Item build\Release\dsound.dll release\dsound.dll
+          Get-ChildItem release | Format-Table Name, Length
+
+      - name: Hand the release files to the publish job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: release-files
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  publish:
+    needs: build
+    runs-on: windows-2022
+    permissions:
+      contents: write      # create the release
+      id-token: write      # sign the build provenance attestation
+      attestations: write
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Get the release files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2
+        with:
+          name: release-files
+          path: release
+
+      - name: SHA-256 checksums
+        shell: pwsh
+        run: |
+          $lines = Get-ChildItem release -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          }
+          # (LF line endings: "sha256sum -c" would read a CR as part of the file name)
+          [IO.File]::WriteAllText((Join-Path $PWD 'release\SHA256SUMS.txt'), ($lines -join "`n") + "`n")
+          $lines
+
+      - name: Build provenance attestation
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8   # v4.2.2
+        with:
+          subject-path: release/*
+
+      - name: VirusTotal (only with the VT_API_KEY secret)
+        continue-on-error: true   # (optional: a VirusTotal failure never stops the release)
+        shell: pwsh
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          if (-not $env:VT_API_KEY) { Write-Host 'No VT_API_KEY secret: VirusTotal skipped.'; exit 0 }
+          $links = foreach ($name in 'Teardown-VR-Installer.exe', 'dsound.dll') {
+            $file = Join-Path release $name
+            $out = curl.exe -s --max-time 300 -X POST --url https://www.virustotal.com/api/v3/files -H "x-apikey: $env:VT_API_KEY" `
+              -F "file=@$file"
+            if ($LASTEXITCODE -or -not ($out -match '"type":\s*"analysis"')) { Write-Warning "VirusTotal upload of $name failed (curl exit code $LASTEXITCODE): $out"; continue }
+            $sha = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            "- $name : https://www.virustotal.com/gui/file/$sha"
+          }
+          if ($links) { $links | Set-Content -Encoding utf8 virustotal.txt; $links }
+          # (a failed curl's exit code would otherwise become the step's)
+          exit 0
+
+      - name: Create the GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $sums = (Get-Content release\SHA256SUMS.txt -Raw).TrimEnd()
+          $vt = if (Test-Path virustotal.txt) { Get-Content virustotal.txt -Raw } else { "Not uploaded automatically for this release. You can upload the files yourself on https://www.virustotal.com or search their SHA-256 there." }
+          $repo = "${{ github.repository }}"
+          $notes = @"
+          Teardown VR $env:TAG, built automatically by GitHub Actions from commit ${{ github.sha }} of this repository.
+
+          This build is made from the public source only, **without the game-derived shaders**: the stereo particles fix and the VR anti-aliasing modes are not in it (the game's own shaders are used). Everything else is the same mod.
+
+          **Warning:** a Teardown update can break the mod. Free, unofficial fan project, provided as is, without warranty and without support. Not affiliated with or endorsed by Tuxedo Labs.
+
+          ### Install
+          Download ``Teardown-VR.zip``, extract it, run ``Installer Teardown VR.exe`` (English or French). Windows may show "Windows protected your PC" for this unsigned program: "More info", then "Run anyway". README.txt (English), LISEZMOI.txt (French) and LICENCES.txt are in the zip. ``Teardown-VR-Installer.exe`` is the same installer on its own, ``dsound.dll`` the mod alone (manual install).
+
+          ### Verify the files
+          SHA-256:
+          ``````
+          $sums
+          ``````
+          Check a file with ``Get-FileHash Teardown-VR.zip -Algorithm SHA256`` (PowerShell), or every downloaded file with ``sha256sum --ignore-missing -c SHA256SUMS.txt``.
+
+          Build provenance (proof that GitHub built these files from this repository): ``gh attestation verify Teardown-VR.zip --repo $repo``
+
+          VirusTotal:
+          $vt
+          "@
+          $notes = ($notes -split "`n" | ForEach-Object { $_ -replace '^          ', '' }) -join "`n"
+          $notes | Set-Content -Encoding utf8 notes.md
+          # (--verify-tag: the release goes on the existing tag, the commit that was built; a tag with a "-" suffix,
+          #  such as v1.0.0-beta.1, makes a pre-release)
+          $pre = @()
+          if ($env:TAG.Contains('-')) { $pre = @('--prerelease') }
+          gh release create $env:TAG (Get-ChildItem release -File | Sort-Object Name).FullName --verify-tag @pre `
+            --repo $repo --title "Teardown VR $env:TAG" --notes-file notes.md

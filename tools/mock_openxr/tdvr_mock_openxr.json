@@ -1,0 +1,7 @@
+{
+    "file_format_version": "1.0.0",
+    "runtime": {
+        "name": "TDVR Mock Headset (test only)",
+        "library_path": "./tdvr_mock_openxr.dll"
+    }
+}

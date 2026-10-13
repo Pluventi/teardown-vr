@@ -1,0 +1,9 @@
+\Processor Information(_Total)\% Processor Utility
+\Processor Information(*)\% Processor Time
+\Process(teardown)\% Processor Time
+\Process(teardown)\Thread Count
+\Process(teardown)\Working Set - Private
+\Process(teardown)\Page Faults/sec
+\System\Context Switches/sec
+\GPU Engine(*engtype_3D)\Utilization Percentage
+\GPU Engine(*engtype_Compute*)\Utilization Percentage

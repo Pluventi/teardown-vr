@@ -1,0 +1,4 @@
+name = Teardown VR
+author = Teardown VR
+description = Play Teardown in virtual reality (Quest 3 via Virtual Desktop, Meta Link or SteamVR). Needs Teardown VR's dsound.dll file in the game folder. Long-press the Menu button on the left controller (or F10) to open the settings. / Joue à Teardown en réalité virtuelle (Quest 3 via Virtual Desktop, Meta Link ou SteamVR). Nécessite le fichier dsound.dll de Teardown VR dans le dossier du jeu. Appui long sur le bouton Menu de la manette gauche (ou F10) pour ouvrir les réglages.
+tags = Gameplay
