@@ -950,6 +950,8 @@ float g_dualStepT = 0;
 unsigned long long g_dualStepFrame = 0;
 bool g_dualTrig[2] = {};               // each trigger held (hysteresis), by gun
 bool g_dualOn = false;                 // the triggers were the guns in the last update
+bool g_atScreen = false;               // the triggers were a game computer screen's mouse in the last update
+int g_screenHand = -1;                 // its pointing hand then (engine.cpp, EngineScreenHand)
 float g_dualQueueT = 0;                // age of the oldest waiting press
 int g_dualLogs = 0;
 
@@ -1342,12 +1344,52 @@ void Update(Mode mode, const HandState& left, const HandState& right, bool uiOpe
                 }
                 off.trigger = 0;
             }
+            // A game computer screen the player sits at (the campaign's mission computer; engine.cpp,
+            // ScreenPointerUpdate): the pointing hand's laser moves its cursor and that hand's trigger is the left
+            // mouse button (the other hand takes the pointer by pulling its trigger on the screen; that pull is
+            // already a click). A press begun with that ray beside the screen does not click, also once the ray
+            // reaches the screen, until released: the cursor stayed where the ray last was, and would click whatever
+            // is there. When the pointer goes to the other hand while the button is down, the button is released,
+            // and pressed again at the next update for that hand (its click). The left trigger does not crouch, a
+            // wrist flick or a sledge tap is no click, no dual wield. A trigger held when this starts or stops counts
+            // as released until let go.
+            const bool atScreen = !EngineModUiShown() && EngineScreenShown();
+            if (atScreen != g_atScreen) {
+                for (int i = 0; i < 2; ++i)
+                    if (*analog[i] > 0.2f) {
+                        g_analogLatch[i] = true;
+                        *analog[i] = 0;
+                    }
+                g_atScreen = atScreen;
+                static int logs = 0;
+                if (logs < 40) {
+                    ++logs;
+                    Log(atScreen ? "Input: at a game computer screen - the pointing hand's trigger is the left mouse button, "
+                                   "the left trigger does not crouch, Y leaves"
+                                 : "Input: left the game computer screen - triggers as usual");
+                }
+            }
+            if (atScreen) {
+                const int sh = EngineScreenHand();
+                const int src = sh >= 0 && (sh == 0) != lh ? 1 : 0;   // (analog[] index: 0 dominant, 1 off hand)
+                float t = src ? off.trigger : dom.trigger;
+                if (!g_actDown[A_UseTool] && !EngineScreenRayOn(sh)) {
+                    if (t > 0.55f) g_analogLatch[src] = true;   // (read as released until let go, above)
+                    t = 0;
+                }
+                if (sh != g_screenHand && g_actDown[A_UseTool]) t = 0;
+                g_screenHand = sh;
+                dom.trigger = t;
+                off.trigger = 0;
+            } else {
+                g_screenHand = -1;
+            }
             // Dual wield (engine.cpp, DualEye: Total Overdose, one gun in each hand), as the player
             // asked: each trigger fires its own hand's gun, one click per press (DualClicks); the off
             // hand's grip crouches (that hand holds a gun: it grabs nothing), its trigger no longer does.
             // Not while a mod's window takes the triggers. A trigger held when this starts or stops
             // counts as released until let go (it neither fires nor crouches).
-            const bool dualOn = EngineDualReady() && !EngineModUiShown();
+            const bool dualOn = EngineDualReady() && !EngineModUiShown() && !atScreen;
             if (dualOn != g_dualOn) {
                 for (int i = 0; i < 2; ++i)
                     if (*analog[i] > 0.2f) {
@@ -1372,10 +1414,10 @@ void Update(Mode mode, const HandState& left, const HandState& right, bool uiOpe
                 DualOff();
                 // (the game's sledge: a light, short pull is one whole strike - SledgeUse; not while the
                 // game's grab holds an object: the left button then throws it, at the usual firm pull)
-                const bool sledge = Cfg().sledgeTap && EngineHoldingSledge() && !g_playerGrabbing;
+                const bool sledge = Cfg().sledgeTap && EngineHoldingSledge() && !g_playerGrabbing && !atScreen;
                 bool use = SledgeUse(sledge, dom.trigger, Inventory::CapturesTrigger(), dt);
                 if (!sledge) use = Hyst(g_actDown[A_UseTool], dom.trigger);
-                SetAct(A_UseTool, (use || swing) && !Inventory::CapturesTrigger());
+                SetAct(A_UseTool, (use || (swing && !atScreen)) && !Inventory::CapturesTrigger());
             }
             // (R3 shows / hides it; shown but far from where the player looks - behind after turning
             // round - R3 brings it back in front of the body instead: VrInventoryRecall)

@@ -71,6 +71,8 @@ struct Settings
     bool  offHandPhysics = true;   // that hand is a physical body (Bonelabs-like): stops at walls, pushes objects
     bool  offGrab        = true;   // its grip always grabs (touched / laser-pointed object; crouch = its trigger); off: the grip crouches too
     bool  offHandPointer = true;   // either hand points at 2D interfaces: the one that pulled its trigger on one last (never by its ray alone)
+    bool  screenPointer  = true;   // the game's computer screens (the campaign's mission computer): the controllers' lasers move their cursor, the pointing hand's trigger clicks (engine.cpp, ScreenPointerUpdate)
+    bool  screenOncePerPair = true; // the screen the player uses is drawn in frame A only: with frameBMode 2 a click there no longer counts twice (engine.cpp, Hook_ScreenRender)
     bool  offLaser       = true;   // a laser from that hand too (stops on our panels); with offGrab its grip pulls what it points at
     bool  grabKeepDistance = true; // an object grabbed with a grip (either hand) stays at the distance it was taken at (no 20 cm pull, no 1.5 m / 1 m minimum); the dominant stick's up / down moves it farther / closer
     float grabMinDistance = 0.50f; // (.ini only) ... the game's grab (dominant hand): at least this far from the eyes, metres (closer, the object would reach into the player)

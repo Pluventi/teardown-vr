@@ -132,6 +132,14 @@ bool EngineModUiShown();
 int  EngineModUiHand();
 // Is that hand's ray (0 left, 1 right) on the window? (found by the left eye of the last pair)
 bool EngineModUiOnWindow(int hand);
+// The player sits at one of the game's interactive screens (the campaign's mission computer) and the controllers
+// point at it (engine.cpp, ScreenPointerUpdate; [Controles] screenPointer): input.cpp makes the pointing hand's
+// trigger the left mouse button.
+bool EngineScreenShown();
+// That pointing hand (0 left, 1 right), -1 when not at a screen.
+int  EngineScreenHand();
+// Is that hand's ray (0 left, 1 right) on the screen? (found in the last frame A)
+bool EngineScreenRayOn(int hand);
 // Its cursor in this eye's image (0..1), for this frame; false when none.
 bool EngineModUiCursor(int eye, float& x, float& y);
 // A mod's menu shown as a floating panel (modUiPanel; engine.cpp, ModPanel): fixed in the room,

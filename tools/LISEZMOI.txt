@@ -197,6 +197,22 @@ Joue à Teardown en réalité virtuelle, comme un jeu VR natif :
     coupe dans les
     réglages (Affichage, "Zoom des caméras de mods").
 
+  ORDINATEUR DU JEU (l'ordinateur des missions de la campagne, au QG)
+    Y pour t'y installer. La vue reste là où est ta tête, avec tes mains et tes
+    lasers (elle ne glisse plus devant l'écran).
+    - Le laser de la main qui tient l'outil déplace le curseur de l'ordinateur ;
+      sa gâchette clique (choisir un lieu, puis une mission).
+    - Pour pointer avec l'autre main : vise l'écran avec elle et tire sa
+      gâchette (L2 ou R2). Ce clic compte déjà, là où elle vise. L'autre main
+      reprend le pointeur de la même façon.
+    - Une gâchette tirée pendant que son laser est à côté de l'écran ne clique
+      pas.
+    - Pendant ce temps la gâchette gauche ne fait plus s'accroupir.
+    - La vraie souris marche toujours : bouge-la, elle prend le curseur ; vise
+      et clique avec une manette pour le reprendre.
+    - Y pour quitter l'ordinateur. Réglages (Contrôles) : "Ordinateur du jeu à
+      la manette" (décoché : comme avant).
+
   MENUS DES MODS À LA SOURIS (revolver THE EVERYTHING REVOLVER, météo de
   Natural Phenomena, menu d'apparition d'objets...)
     Quand un mod ouvre une fenêtre qu'on utilise à la souris, elle s'affiche

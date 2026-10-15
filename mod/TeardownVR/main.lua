@@ -680,6 +680,7 @@ end
 
 local function onDeactivate()
 	wasActive = false
+	if tdvrScreenTick then pcall(tdvrScreenTick, false) end   -- (l'écran du jeu retrouve son cadrage)
 	if physDestroy then physDestroy() end
 	if physSetPlayerMask then physSetPlayerMask(false) end
 	if offArm.destroy then offArm.destroy() end
@@ -828,6 +829,7 @@ local function setPlayerAim(yaw, pitch, move)
 		local pos = move and VecAdd(pt.pos, move) or pt.pos
 		SetPlayerTransformWithPitch(Transform(pos, QuatEuler(pitch, yaw, 0)))
 		SetPlayerVelocity(vel)
+		tdvrAimNow = true   -- (la caméra du joueur tourne tout de suite : voir pcRot dans tick)
 	else
 		-- Seulement l'orientation : repositionner le joueur à chaque image (la main
 		-- bouge toujours un peu) faisait trembler la caméra et l'outil (mesuré :
@@ -4221,6 +4223,51 @@ function init()
 	pcall(tdvrOffHandCleanup)   -- (main physique et objets tenus d'une partie rechargée)
 end
 
+-- Ordinateur du jeu (l'écran où le joueur est installé : l'ordinateur des missions de la campagne).
+-- Le jeu fait glisser la caméra devant l'écran ; en VR la vue se détachait alors des mains et des
+-- lasers, et tremblait quand un poignet tournait. L'écran porte le tag « nocam » (le réglage du jeu
+-- pour un écran sans cadrage de la caméra) tant que le joueur l'utilise : la vue reste à la tête,
+-- les lasers visent l'écran (la DLL en déplace le curseur, voir engine.cpp ScreenPointerUpdate).
+-- Le tag est enlevé ensuite, seulement s'il a été mis ici : l'écran porte aussi « tdvrnocam ». (Une
+-- sauvegarde rapide garde les tags mais pas cette table : au premier tick après un chargement, les
+-- écrans marqués sont rendus.) La DLL garde aussi le glissement de la caméra du jeu à 0 (« nocam »
+-- l'arrête seulement là où il en est). (global : pas d'upvalue)
+tdvrScreen = { nonserializable = true, tagged = 0, swept = false }
+local function screenUntag(h)
+	if IsHandleValid(h) then
+		RemoveTag(h, "nocam")
+		RemoveTag(h, "tdvrnocam")
+	end
+end
+function tdvrScreenTick(on)
+	local s = tdvrScreen
+	local scr = 0
+	if on and GetPlayerScreen then
+		local ok, h = pcall(GetPlayerScreen)
+		if ok and type(h) == "number" then scr = h end
+	end
+	if not s.swept then
+		s.swept = true
+		local ok, list = pcall(FindScreens, "tdvrnocam", true)
+		if ok and type(list) == "table" then
+			for i = 1, #list do
+				if list[i] ~= scr then screenUntag(list[i]) end
+			end
+		end
+	end
+	if s.tagged ~= 0 and s.tagged ~= scr then
+		screenUntag(s.tagged)
+		s.tagged = 0
+		pcall(SetClipboardText, "TDVRL screen: nocam removed")
+	end
+	if scr ~= 0 and s.tagged == 0 and IsHandleValid(scr) and (not HasTag(scr, "nocam") or HasTag(scr, "tdvrnocam")) then
+		SetTag(scr, "nocam")
+		SetTag(scr, "tdvrnocam")
+		s.tagged = scr
+		pcall(SetClipboardText, "TDVRL screen: nocam set")
+	end
+end
+
 function tick(dt)
 	lastTickDt = dt
 	tickCount = tickCount + 1
@@ -4269,6 +4316,7 @@ function tick(dt)
 	end
 	if st.paused then return end
 	if not wasActive then onActivate() end
+	tdvrScreenTick(true)
 	if st.recenter ~= lastRecenter then
 		lastRecenter = st.recenter
 		vrYaw = GetPlayerYaw()
@@ -4294,6 +4342,7 @@ function tick(dt)
 	local pt0 = GetPlayerTransform()
 	local aim0 = QuatEuler(GetPlayerPitch(), GetPlayerYaw(), 0)
 	aimSetThisTick = false
+	tdvrAimNow = false
 
 	local anchorRot = QuatEuler(0, vrYaw, 0)
 	local scale = st.worldScale
@@ -4377,11 +4426,14 @@ function tick(dt)
 	-- main) : on la décale jusqu'à l'œil et on impose le champ de vision.
 	-- Le décalage s'applique à la caméra du joueur telle qu'elle sera rendue,
 	-- donc après la visée et le déplacement roomscale de cette image.
+	-- Le jeu applique ce décalage dans la rotation de SA caméra à l'image rendue : celle de pc0
+	-- (construite avant ce tick, avec la visée du tick précédent) - la visée de ce tick (TDVRY,
+	-- SetPlayerPitch) ne l'atteint qu'à l'image suivante. Exprimé dans la nouvelle visée, le
+	-- décalage tournait avec elle : la caméra bougeait quand le poignet tournait (de 0,1 m pour
+	-- 20 degrés). Seul SetPlayerTransformWithPitch (roomscale) tourne la caméra tout de suite, et
+	-- exactement vers cette visée (sans le recul, les secousses ni le décalage d'un autre mod de pc0).
 	local pcRot = pc0.rot
-	if aimSetThisTick then
-		local q = aim0
-		pcRot = QuatRotateQuat(QuatRotateQuat(QuatEuler(lastAimPitch, lastAimYaw, 0), Quat(-q[1], -q[2], -q[3], q[4])), pc0.rot)
-	end
+	if aimSetThisTick and tdvrAimNow then pcRot = QuatEuler(lastAimPitch, lastAimYaw, 0) end
 	local pc = Transform(move and VecAdd(pc0.pos, move) or pc0.pos, pcRot)
 	if not mapView then
 		SetCameraOffsetTransform(TransformToLocalTransform(pc, cam))

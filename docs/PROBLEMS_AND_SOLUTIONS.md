@@ -44,6 +44,7 @@ problems a player sees, so they use a shorter format.
 | Smoke or rain that looks different in each eye | The introduction of F, then F1-F5 |
 | A feature that says "not recognised" after a game update | A2, and M9 |
 | Grabbing, tools and weapons | I |
+| The campaign's mission computer, or a shaking view | K4-K6, C9 |
 | Other mods' cameras, crosshairs and windows | J |
 | A problem that turned out not to be the mod | M11 |
 
@@ -91,7 +92,7 @@ problems a player sees, so they use a shorter format.
 | *Known limit* | Understood, not fixed. |
 | *Rejected* | Measured, then not adopted. |
 
-The status is a snapshot of the development notes on 2026-10-13.
+The status is a snapshot of the development notes on 2026-10-13, and on 2026-10-15 for C9 and K4 to K6.
 
 ### Game-derived shaders (not in this repository)
 
@@ -141,6 +142,7 @@ The entries concerned say so in their **Files / settings** field.
   - [C6. Head bob shaking the whole view](#c6-head-bob-shaking-the-whole-view)
   - [C7. The desktop compositor capped the game at the monitor's refresh rate](#c7-the-desktop-compositor-capped-the-game-at-the-monitors-refresh-rate)
   - [C8. The level map was flat, zoomed and distorted](#c8-the-level-map-was-flat-zoomed-and-distorted)
+  - [C9. The view shook when a wrist turned (head offset in the next frame's aim)](#c9-the-view-shook-when-a-wrist-turned-head-offset-in-the-next-frames-aim)
 - [D. Resolution and image size](#d-resolution-and-image-size)
   - [D1. Choosing the VR render resolution: the game sizes everything from the monitor at start](#d1-choosing-the-vr-render-resolution-the-game-sizes-everything-from-the-monitor-at-start)
   - [D2. Low-resolution image when the game starts before the headset is connected](#d2-low-resolution-image-when-the-game-starts-before-the-headset-is-connected)
@@ -213,6 +215,9 @@ The entries concerned say so in their **Files / settings** field.
   - [K1. The in-level pause screen was square instead of 16:9](#k1-the-in-level-pause-screen-was-square-instead-of-169)
   - [K2. The mod's own panels followed the head, and saving their place froze the game](#k2-the-mods-own-panels-followed-the-head-and-saving-their-place-froze-the-game)
   - [K3. Choosing tools in VR: the inventory](#k3-choosing-tools-in-vr-the-inventory)
+  - [K4. The campaign's mission computer: clicking a mission did nothing, even with the real mouse](#k4-the-campaigns-mission-computer-clicking-a-mission-did-nothing-even-with-the-real-mouse)
+  - [K5. The campaign's mission computer: the controllers could not move its cursor](#k5-the-campaigns-mission-computer-the-controllers-could-not-move-its-cursor)
+  - [K6. Seated at a game computer, the view glided away from the hands](#k6-seated-at-a-game-computer-the-view-glided-away-from-the-hands)
 - [L. Headset runtime, installer, logs and language](#l-headset-runtime-installer-logs-and-language)
   - [L1. The wrong OpenXR runtime was used (Virtual Desktop or Quest Link)](#l1-the-wrong-openxr-runtime-was-used-virtual-desktop-or-quest-link)
   - [L2. Installing the mod for players](#l2-installing-the-mod-for-players)
@@ -664,6 +669,37 @@ The entries concerned say so in their **Files / settings** field.
 - **Files / settings.** `src/engine.cpp` (`Hook_CamSet`, map mode), `mod/TeardownVR/main.lua`. RE §6 bis.
 
 ---
+
+### C9. The view shook when a wrist turned (head offset in the next frame's aim)
+
+- **Symptom.** Turning either wrist shook the view, while walking and while seated at the campaign's mission
+  computer.
+- **Root cause.**
+  - The eye position is the game's camera position plus the head offset the Lua mod sets with
+    `SetCameraOffsetTransform`. The engine applies that offset in its camera's rotation (`Camera::update`,
+    `+3689a`: position + rotate(rotation before the offset, offset)).
+  - The Lua mod expressed the offset in the NEW aim of the current tick. But the aim reaches the camera only at the
+    next `Player::update` (`0xc2360`, called before the scripts): the yaw goes through `TDVRY` into `+0x704`, and
+    `SetPlayerPitch` writes `+0x700`. The camera rendered this frame (`+0x64c`, copied at render time by
+    `0xc54a0`) still has the previous tick's aim.
+  - So every aim change rotated the head offset by the aim's change: an error of (angle x head offset) for one
+    frame. The aim follows the laser's target, which jumps with wrist rotation (laser parallax, steep aims), and
+    the free hand's wrist moves the idle hand's aim too.
+  - Seated at a screen, the game also glided its camera to the screen camera (see K6): the rotation used for the
+    offset was then the screen's, whatever the aim.
+- **How it was found.** Reverse engineering of the camera update order and of the camera offset, confirmed by the
+  older `camerr` / `badcam` debug lines (0.5 to 5 degree errors), then measured on the mock.
+- **Fix.** `main.lua`, `tick`: the offset is built in `pc0.rot`, the camera rotation read at the start of the tick,
+  which is the one rendered. Only when `setPlayerAim` used `SetPlayerTransformWithPitch` (a roomscale step, or no
+  yaw writer) does the camera turn at once, exactly to `QuatEuler(pitch, yaw, 0)` (`0xc1fc0` writes `+0x64c`
+  verbatim): that rotation is used then (`tdvrAimNow`).
+- **Verification.** Mock, head still, `heightOffset=0.3`, the right controller's aim stepping 0 / 20 degrees of yaw
+  and -10 / -40 degrees of pitch every 0.5 s. Before: the eye jumped 135 mm at each step ("max jerk 270 mm",
+  `camerr` 0.135 m / 30.4 degrees). After: 0.0 mm and 0.000 degrees. Confirmed in the headset on 2026-10-15.
+- **Limits.** The head offset is still applied by the game; anything else that rotates the game camera between the
+  tick and the render would show again. None is known on foot.
+- **Status.** Confirmed in the headset.
+- **Files / settings.** `mod/TeardownVR/main.lua` (`tick`, `setPlayerAim`, `tdvrAimNow`).
 
 ## D. Resolution and image size
 
@@ -2388,6 +2424,85 @@ and discarded otherwise. The TAA then averages these 0/1 patterns into transpare
   inventoryOnSwitch`.
 
 ---
+
+### K4. The campaign's mission computer: clicking a mission did nothing, even with the real mouse
+
+- **Symptom.** At the hub's mission computer, a place could be opened but a mission could not be selected: its
+  PLAY panel never opened, with the controllers or with the real desktop mouse.
+- **Root cause.**
+  - The game's in-world screens draw their script in `Screen::render` (`0x467dd0`), from `Game::render`, so in both
+    frames of a stereo pair. Their input is copied from the player's only in `Screen::update` (`0x4695d0`), in
+  `Game::update`.
+  - With `[Performance] frameBMode=2`, frame B runs no `Game::update` (G4) but still renders. The screen's script
+    (`data/ui/terminal.lua`, which reads the clicks in `draw()`) saw frame A's "left button pressed" again.
+  - A mission row is a toggle (`terminal.lua`: selected if not, else unselected): selected in frame A, unselected in
+    frame B. A place's dot is not a toggle, which is why places opened.
+- **How it was found.** Reverse engineering of the screen loop (`0xeb160`) and of the input binding, and the
+  player's log (Interact while "frame B mode 2: 300 render-only of 300").
+- **Fix.** `Hook_ScreenRender`: in a render-only frame B, the screen the local player uses (`player+0x9a0`) is not
+  drawn again. Its texture keeps frame A's image, cursor included, the same in both eyes. Every other screen is
+  drawn as before, so their sound loops are still renewed.
+- **Verification.** Confirmed in the headset: mission rows select and the PLAY panel opens, with the controllers and
+  with the real mouse.
+- **Limits.** A mod's own interactive screen whose `draw()` plays a sound loop gets that loop renewed every other
+  engine frame while the player uses it. The game's computer plays none. A mod's `draw()` that toggles on a click
+  outside such screens is not covered.
+- **Status.** Confirmed in the headset.
+- **Files / settings.** `src/engine.cpp` (`Hook_ScreenRender`, `InitScreens`); `[Controles] screenOncePerPair`.
+
+### K5. The campaign's mission computer: the controllers could not move its cursor
+
+- **Symptom.** Seated at the mission computer (Y), only the real mouse moved its cursor.
+- **Root cause.** `Screen::update` moves the cursor by the player's RAW mouse motion only (input `+0x3fc/+0x400`),
+  clamped to the resolution, and gives the result as an input event of type 4 (`Input::handleEvent`
+  `0x4f3e30`, called at `0x469a48`). The controllers make no raw mouse motion. The mod's other pointers
+  (menus, mods' windows) work differently.
+- **How it was found.** Reverse engineering of `Screen::update` and of the input class.
+- **Fix.**
+  - `ScreenPointerUpdate`, in each frame A (from `Hook_CamSet`): the local player's screen (`player+0x9a0`, the
+    screen pointing back at the player at `+0x2258`, enabled and interactive), its world transform (the one the
+    renderer draws it with, `0x4682c0`), size and resolution.
+  - Each hand's aim ray goes from the recentred room to the world as `main.lua`'s `toWorld` does, from the left
+    eye's room pose and its drawn camera. It is intersected with the screen's mesh (Moller-Trumbore): the hit's UV
+    gives the pixel, `u x width`, `(1 - v) x height`, as in the engine's touch hit test (`0x467900`). Beside the
+    mesh, or if the mesh does not pass its checks, the flat rectangle is used (within 2% of its edges).
+  - `Hook_ScreenCursor` (on `Input::handleEvent`, only for the call returning to `0x469a4d`) gives that pixel to
+    the cursor event.
+  - The pointing hand: the dominant one when the player sits down; the other hand takes it by pulling its trigger
+    with its ray on the screen, and that pull is already a click where it points. A pull blocked by the pointing
+    hand's held trigger waits until that trigger is released.
+  - `input.cpp`: the pointing hand's trigger is the left mouse button; the other trigger does nothing (the left
+    trigger no longer crouches there); a pull begun with the ray beside the screen does not click, also when the
+    ray reaches the screen, until released; when the pointer changes hands with the button down, the button is
+    released and pressed again for the new hand. No sledge tap, wrist swing or dual wield there.
+  - The real mouse still works: its motion (2 counts or more) takes the cursor; the laser takes it back with a
+    click on the screen, or by moving 24 pixels within 0.25 s once the mouse has rested 0.75 s.
+- **Verification.** Confirmed in the headset on 2026-10-15: the cursor followed the laser, five controller clicks
+  counted, then the real mouse took the cursor.
+- **Limits.** One frame of latency, like the rest of the cursor. A screen on a moving body is hit where it is drawn.
+- **Status.** Confirmed in the headset.
+- **Files / settings.** `src/engine.cpp` (`ScreenPointerUpdate`, `ScreenRayPixel`, `ScreenMeshHit`,
+  `Hook_ScreenCursor`, `InitScreens`), `src/input.cpp`; `[Controles] screenPointer`.
+
+### K6. Seated at a game computer, the view glided away from the hands
+
+- **Symptom.** After Y at the mission computer, the view moved in front of the screen while the hands and the lasers
+  stayed behind, and the view shook with the wrists (C9).
+- **Root cause.** While the local player uses a screen without the `nocam` tag, `Game::frame` raises a glide value
+  (`game+0x358`, 1.2 per second) and the camera update moves the camera toward a point in front of the screen
+  (0.43 m away for the hub's computer) and turns it to the screen. The Lua mod's room stays at the player.
+- **How it was found.** Reverse engineering of `Game::frame` (`0x72eb7`-`0x72f59`) and of the camera update.
+- **Fix.**
+  - `main.lua` (`tdvrScreenTick`): while `GetPlayerScreen()` is not 0, the screen gets the tags `nocam` and
+    `tdvrnocam` (the second marks it as ours); they are removed when the player leaves, when VR stops, and at the
+    next script start for any screen still marked (a quick save keeps tags).
+  - `nocam` only freezes the glide where it is (`0x72f06` skips both its rise and its fall), so a glide begun before
+    the tag would stay. In VR, `ScreenPointerUpdate` also writes 0 to `game+0x358` while the player uses a screen
+    (offset read from `0x72f1a`).
+- **Verification.** Confirmed in the headset: the view stays at the head, with the hands and lasers.
+- **Limits.** The view is not moved closer to the screen: lean in to read small text.
+- **Status.** Confirmed in the headset.
+- **Files / settings.** `mod/TeardownVR/main.lua` (`tdvrScreenTick`), `src/engine.cpp` (`ScreenPointerUpdate`).
 
 ## L. Headset runtime, installer, logs and language
 

@@ -12,6 +12,10 @@ Il a été fait et testé avec un Meta Quest 3, via Virtual Desktop et Quest Lin
 
 La documentation complète est en anglais : [README.md](README.md).
 
+**Dernière mise à jour (15/10/2026) :** l'ordinateur des missions de la campagne marche en VR (clics, curseur
+déplacé par le laser des manettes), et la vue ne tremble plus quand un poignet tourne. Détails (en anglais) :
+[CHANGELOG.md](CHANGELOG.md).
+
 > **Attention : une mise à jour de Teardown peut casser le mod.**
 > Le mod retrouve les fonctions internes du jeu par des motifs d'octets écrits pour la version 2.0.1. Après une
 > mise à jour, les fonctions non reconnues se désactivent et l'écrivent dans `TeardownVR.log`. La stéréo
@@ -27,6 +31,8 @@ La documentation complète est en anglais : [README.md](README.md).
 - Inventaire VR porté à la ceinture, et conduite des véhicules aux manettes.
 - Prise en charge des autres mods : visée, réticules, fenêtres et menus en panneaux flottants, caméras, touches
   du clavier.
+- Les ordinateurs du jeu (l'ordinateur des missions de la campagne) : le curseur suit le laser de la manette et
+  la gâchette clique.
 - Panneau de réglages en anglais ou en français (F10, ou appui long sur Menu de la manette gauche).
 - Détection automatique du casque au démarrage.
 

@@ -136,6 +136,8 @@ std::vector<Field> Fields(Settings& s)
     F_("Controles", offHandPhysics, 'b');
     F_("Controles", offGrab, 'b');
     F_("Controles", offHandPointer, 'b');
+    F_("Controles", screenPointer, 'b');
+    F_("Controles", screenOncePerPair, 'b');
     F_("Controles", offLaser, 'b');
     F_("Controles", grabKeepDistance, 'b');
     F_("Controles", grabMinDistance, 'f');

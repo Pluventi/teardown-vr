@@ -2939,6 +2939,8 @@ void ApplyUiShift(const Pose& eyeCam, const float* proj, int eye, bool room)
     ModUiPointer(eye, proj, w, h, V);
 }
 
+void ScreenPointerUpdate(const Pose& cam);   // (the game's computer screens, below)
+
 void __fastcall Hook_CamSet(void* cam, const float* pos, const float* rot)
 {
     BYTE* player = g_gameObj ? *(BYTE**)(g_gameObj + g_offGamePlayer) : nullptr;
@@ -3053,6 +3055,8 @@ void __fastcall Hook_CamSet(void* cam, const float* pos, const float* rot)
                 g_leftCam.q = AxisAngle({ 0, 1, 0 }, g_anchorYaw * 3.14159265f / 180.0f) * g_leftEyeRot;
                 if (mapPhase) MapCamera(player, mapPhase, blend, g_leftCam);
                 else g_lastViewPos = g_leftCam.p;
+                // (the game's computer screen the player sits at: the controllers point at it)
+                if (!mapPhase) ScreenPointerUpdate(g_leftCam);
                 if (Cfg().debugLua) ToolVsCamera(g_leftCam, 0);
                 g_uiDir = Rotate(g_leftCam.q, { 0, 0, -1 });   // the HUD straight ahead of the head
                 g_leftCamRoom = !mapPhase;
@@ -4354,6 +4358,565 @@ void InitModUiPointer()
         "UiWorldToPixel: 3D camera game+%x, ArgVec +%llx, pixel bend flag game+%x, results %s)",
         (unsigned long long)(pix - g_base), g_mouseUiCallCount, g_off3dCam, (unsigned long long)(argVec - g_base),
         g_offUiPixelBend, g_offRetCount ? "readable" : "not readable");
+}
+
+// ---------------------------------------------------------------------------
+// The game's own computer screens (the campaign's mission computer)
+// ---------------------------------------------------------------------------
+// Read in teardown.exe 2.0.1 (docs/REVERSE_ENGINEERING.md, 7 quinquies). A screen entity (<screen> in a level) runs a UI
+// script into its own texture. With Interact the player sits at an interactive one (SetPlayerScreen, +c1a50:
+// player +9A0h = the screen, screen +2258h = the player). The game then gives the player's own controls no input,
+// glides the camera in front of the screen (unless it is tagged "nocam"), and every frame Screen::update
+// (+4695d0, in Game::update) copies the player's mouse and keys into the screen's input (+D0h) and moves the
+// screen's cursor by the RAW mouse motion only: cursor + motion, clamped to the resolution, given as an input
+// event of type 4 (Input::handleEvent +4f3e30, called at +469a48). The screen's script draws in Screen::render
+// (+467dd0), from Game::render: in both frames of a stereo pair.
+// Three problems in VR, found by the player at the mission computer:
+//   - clicks did nothing, even with the real mouse: in frameBMode 2 the right eye's frame B runs no Game::update
+//     but still draws, so the screen's script read frame A's click a second time. The mission list toggles a
+//     row on each click: selected, then unselected at once, and the PLAY panel never opened. The screen the
+//     player uses is now drawn in frame A only (Hook_ScreenRender). Its texture, the cursor included, is the
+//     same for both eyes.
+//   - the controllers never moved the cursor (they make no raw mouse motion). Each frame A finds where the
+//     pointing hand's ray meets the screen's mesh (ScreenPointerUpdate). The triangle's UV is the pixel, as in
+//     the engine's own touch hit test (+467900). The next Screen::update's cursor event is given that pixel
+//     (Hook_ScreenCursor). The pointing hand is the dominant one when the player sits down, then the hand whose
+//     trigger was pulled last with its ray on the screen; that pull is already a click, where it points.
+//     input.cpp makes that hand's trigger the left mouse button; the other trigger then does nothing, so the
+//     left one no longer crouches. The real mouse still works: when it moves it takes the cursor, and the laser
+//     takes it back by a click, or by moving 24 pixels within a quarter of a second once the mouse has rested
+//     0.75 s (a controller drifting slowly, or hanging from its strap, does not).
+//   - the camera shake: the view glided in front of the screen, away from the hands and lasers, and the head's
+//     offset turned with the aim there. main.lua tags the screen "nocam" while the player uses it, and the DLL
+//     keeps the game's glide (game +358h, Game::frame +72f1a) at 0 meanwhile: "nocam" only stops it where it is
+//     (+72f06 skips both its rise and its fall), so a glide begun before the tag - the player sat down before VR
+//     rendered, or took the headset off while seated - would otherwise stay. The view stays at the head, with
+//     the hands, the lasers and the screen.
+using PFN_ScreenRender = void(__fastcall*)(BYTE* screen, void* a2, void* a3, void* a4);
+PFN_ScreenRender Real_ScreenRender = nullptr;
+using PFN_InputEvent = uintptr_t(__fastcall*)(BYTE* input, const int* ev, void* a3, void* a4);
+PFN_InputEvent Real_InputEvent = nullptr;
+using PFN_ScreenXf = float*(__fastcall*)(BYTE* screen, float* out);   // world transform: pos xyz, quat xyzw
+
+struct ScreenState
+{
+    // Read from the game's code at start (InitScreens).
+    bool ready = false;              // the controllers can point at screens
+    bool renderHooked = false;       // the screen in use is drawn once per stereo pair
+    PFN_ScreenXf xf = nullptr;       // screen world transform: the one the renderer draws it with (+4682c0)
+    const void* cursorRet = nullptr; // return address of Screen::update's cursor event (+469a4d)
+    uint32_t blend = 0;              // game: the camera's glide to the screen in use, 0..1 (+358h)
+    uint32_t plScreen = 0;           // player -> screen in use (+9A0h)
+    uint32_t scrPlayer = 0;          // screen -> player using it (+2258h)
+    uint32_t scrInput = 0;           // screen's input (+D0h)
+    uint32_t plInput = 0;            // player's input (+AE0h)
+    uint32_t enabled = 0, interactive = 0;   // bytes (+B8h, +B9h)
+    uint32_t resX = 0, resY = 0;     // resolution, pixels (ints +70h, +74h)
+    uint32_t sizeX = 0, sizeY = 0;   // size, metres (floats +64h, +68h)
+    uint32_t vtx = 0, stride = 0, posAttr = 0, uvAttr = 0, vtxCount = 0, idx = 0, idxCount = 0;   // its mesh
+    uint32_t deltaX = 0, deltaY = 0; // input: raw mouse motion this frame (ints +3FCh, +400h)
+    uint32_t device = 0;             // input: last device (+121Ch, 3 = touch)
+    // The screen in use, found each frame A (ScreenPointerUpdate). Never read outside the frame it was found in:
+    // Hook_ScreenCursor checks it again from the local player.
+    BYTE* screen = nullptr;
+    uint64_t frame = 0;              // engine frame it was last seen in use
+    double since = 0;                // the player sat down (ProfNow, milliseconds)
+    int hand = -1;                   // pointing hand: 0 left, 1 right
+    bool trigDown[2] = {};           // each trigger held (the same thresholds as the mouse buttons in input.cpp)
+    bool pend[2] = {};               // that trigger was pulled on the screen while the pointing hand's was held
+    bool hitPrev = false;            // the pointing hand's ray was on the screen in the last frame A
+    float px = 0, py = 0;            // the pointing hand's pixel
+    uint64_t pxFrame = 0;            // engine frame px / py are from
+    float refX = 0, refY = 0;        // the pointing ray's pixel at refT (laser motion, below)
+    double refT = 0;                 // (milliseconds)
+    bool laserOwns = true;           // the laser drives the cursor (otherwise the real mouse does)
+    bool laserMoved = false;         // the laser moved 24 px within 0.25 s, the mouse resting for 0.75 s
+    bool pressed = false;            // a trigger was pulled on the screen since the last cursor event
+    bool mouseLast = false;          // the real mouse moved at the last cursor event
+    double mouseTime = -1e9;         // the real mouse last moved (ProfNow, milliseconds)
+    // Its mesh, checked at each sitting (ScreenMeshCheck): 1 usable, 0 not (the flat rectangle is used), -1 not
+    // checked; zmax its bulge; misses: consecutive hits too far from the flat rectangle's.
+    const void* meshVb = nullptr;
+    int meshNv = 0;
+    uint32_t meshNi = 0;
+    int meshOk = -1;
+    float meshZmax = 0;
+    int meshMisses = 0;
+    // Diagnostics (one line per sitting, and every 10 s while seated).
+    unsigned written = 0, mouseFrames = 0, presses = 0, skipped = 0, meshHits = 0, flatHits = 0, handChanges = 0;
+    float blendFound = 0;            // the game's glide when the DLL first reset it in this sitting
+    double lastLog = 0;
+} g_scr;
+std::atomic<uint64_t> g_scrShownFrame{ 0 };   // last engine frame A the player was seen at a screen (input.cpp)
+std::atomic<int> g_scrHand{ -1 };
+std::atomic<bool> g_scrRayOn[2] = {};
+
+// The screen the player uses, in a right-eye frame B that ran no Game::update (frameBMode 2): not drawn again. Its
+// texture keeps frame A's drawing (the same for both eyes), and its script does not read frame A's click twice.
+// The other screens (TVs, a mod's screens) are drawn as before: their scripts get no input, and their sound loops
+// are renewed by that drawing. (A mod's screen the player uses, if its draw() plays a sound loop: that loop is
+// renewed every other engine frame. The campaign's computer plays none: data\ui\terminal.lua, UiSound only.)
+void __fastcall Hook_ScreenRender(BYTE* screen, void* a2, void* a3, void* a4)
+{
+    if (g_frameBRenderOnly == g_frameCounter && g_vrActive && screen && Cfg().screenOncePerPair) {
+        BYTE* pl = LocalPlayer();
+        if (pl && *(BYTE**)(pl + g_scr.plScreen) == screen) {
+            ++g_scr.skipped;
+            return;
+        }
+    }
+    Real_ScreenRender(screen, a2, a3, a4);
+}
+
+// Screen::update's cursor event (type 4, x, y) for the screen the local player uses: the pointing hand's pixel,
+// found in the last frame A, while the laser owns the cursor. Every other input event is the game's.
+uintptr_t __fastcall Hook_ScreenCursor(BYTE* input, const int* ev, void* a3, void* a4)
+{
+    ScreenState& s = g_scr;
+    if (_ReturnAddress() == s.cursorRet && ev && ev[0] == 4 && g_vrActive && s.screen &&
+        g_frameCounter - s.frame <= 2) {
+        BYTE* pl = LocalPlayer();
+        BYTE* S = input - s.scrInput;
+        if (pl && S == s.screen && *(BYTE**)(pl + s.plScreen) == S && *(BYTE**)(S + s.scrPlayer) == pl) {
+            const BYTE* in = pl + s.plInput;
+            // (a lone count - a mouse resting on the desk - does not take the cursor)
+            const int m = std::abs(*(const int*)(in + s.deltaX)) + std::abs(*(const int*)(in + s.deltaY));
+            const bool mouse = m >= 2 || (m == 1 && s.mouseLast);
+            s.mouseLast = m > 0;
+            const bool laser = g_frameCounter - s.pxFrame <= 2;
+            static int logs = 0;
+            if (mouse) {
+                if (s.laserOwns && logs < 40) {
+                    ++logs;
+                    Log("Screen: the real mouse moves the cursor");
+                }
+                s.laserOwns = false;
+                s.mouseTime = ProfNow();
+                ++s.mouseFrames;
+            } else if (!s.laserOwns && laser && (s.pressed || s.laserMoved)) {
+                s.laserOwns = true;
+                if (logs < 40) {
+                    ++logs;
+                    Log("Screen: the laser moves the cursor again (%s)", s.pressed ? "trigger pulled on the screen" : "laser moved");
+                }
+            }
+            s.pressed = false;
+            s.laserMoved = false;
+            if (s.laserOwns && laser && *(const int*)(in + s.device) != 3) {
+                const int e[4] = { ev[0], ev[1], (int)std::lround(s.px), (int)std::lround(s.py) };
+                ++s.written;
+                return Real_InputEvent(input, e, a3, a4);
+            }
+        }
+    }
+    return Real_InputEvent(input, ev, a3, a4);
+}
+
+// The engine's own screen world transform, under SEH (a screen of a mod on a shape being destroyed).
+bool ScreenTransformGuarded(PFN_ScreenXf fn, BYTE* screen, float* out)
+{
+    __try {
+        fn(screen, out);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+// Is the screen's mesh what the cursor needs? Vertex positions in the screen's own space within its rectangle (z:
+// its bulge), UVs in 0..1, u growing with x and v with y (the engine's pixel: u x width, (1 - v) x height).
+// 1 usable (zmax: its largest |z|), 0 not. (The game builds a 32 x 16 grid, +468950.)
+int ScreenMeshCheck(BYTE* S, const ScreenState& s, float w, float h, float& zmax)
+{
+    __try {
+        BYTE* vb = *(BYTE**)(S + s.vtx);
+        const int stride = *(int*)(S + s.stride), nv = *(int*)(S + s.vtxCount);
+        const int pa = *(uint16_t*)(S + s.posAttr), ua = *(uint16_t*)(S + s.uvAttr);
+        const int* ib = *(int**)(S + s.idx);
+        const uint32_t ni = *(uint32_t*)(S + s.idxCount);
+        if (!vb || !ib || stride < 20 || stride > 256 || pa + 12 > stride || ua + 8 > stride || nv < 3 || nv > 40000 ||
+            ni < 3 || ni > 60000 || ni % 3)
+            return 0;
+        float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f, uMinX = 0, uMaxX = 0, vMinY = 0, vMaxY = 0;
+        zmax = 0;
+        for (int i = 0; i < nv; ++i) {
+            const float* p = (const float*)(vb + (size_t)i * stride + pa);
+            const float* t = (const float*)(vb + (size_t)i * stride + ua);
+            if (!std::isfinite(p[0]) || !std::isfinite(p[1]) || !std::isfinite(p[2]) || !std::isfinite(t[0]) ||
+                !std::isfinite(t[1]) || std::abs(p[0]) > 0.55f * w + 0.02f || std::abs(p[1]) > 0.55f * h + 0.02f ||
+                std::abs(p[2]) > 0.3f || t[0] < -0.02f || t[0] > 1.02f || t[1] < -0.02f || t[1] > 1.02f)
+                return 0;
+            if (p[0] < minX) { minX = p[0]; uMinX = t[0]; }
+            if (p[0] > maxX) { maxX = p[0]; uMaxX = t[0]; }
+            if (p[1] < minY) { minY = p[1]; vMinY = t[1]; }
+            if (p[1] > maxY) { maxY = p[1]; vMaxY = t[1]; }
+            zmax = std::max(zmax, std::abs(p[2]));
+        }
+        for (uint32_t k = 0; k < ni; ++k)
+            if ((unsigned)ib[k] >= (unsigned)nv) return 0;
+        return maxX - minX > 0.5f * w && maxY - minY > 0.5f * h && uMaxX > uMinX + 0.5f && vMaxY > vMinY + 0.5f;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+
+// The ray o + t d (screen space) on the screen's mesh: the nearest triangle hit, its UV. 1 hit, 0 no triangle
+// hit, -1 the mesh could not be read.
+int ScreenMeshHit(BYTE* S, const ScreenState& s, Vec3 o, Vec3 d, float& u, float& v)
+{
+    __try {
+        BYTE* vb = *(BYTE**)(S + s.vtx);
+        const int stride = *(int*)(S + s.stride), nv = *(int*)(S + s.vtxCount);
+        const int pa = *(uint16_t*)(S + s.posAttr), ua = *(uint16_t*)(S + s.uvAttr);
+        const int* ib = *(int**)(S + s.idx);
+        const uint32_t ni = *(uint32_t*)(S + s.idxCount);
+        if (vb != s.meshVb || nv != s.meshNv || ni != s.meshNi || !ib) return -1;   // (another mesh than the one checked)
+        float best = 1e30f;
+        int found = 0;
+        for (uint32_t k = 0; k + 2 < ni; k += 3) {
+            const int i[3] = { ib[k], ib[k + 1], ib[k + 2] };
+            Vec3 P[3];
+            for (int j = 0; j < 3; ++j) {
+                if ((unsigned)i[j] >= (unsigned)nv) return -1;
+                const float* p = (const float*)(vb + (size_t)i[j] * stride + pa);
+                P[j] = { p[0], p[1], p[2] };
+            }
+            // (Moller-Trumbore, both faces; the tests are written so that a NaN fails them)
+            const Vec3 e1 = P[1] - P[0], e2 = P[2] - P[0], pv = Cross(d, e2);
+            const float det = Dot(e1, pv);
+            if (!(std::abs(det) >= 1e-12f)) continue;
+            const float inv = 1.0f / det;
+            const Vec3 tv = o - P[0];
+            const float b1 = Dot(tv, pv) * inv;
+            if (!(b1 >= -1e-5f && b1 <= 1.00001f)) continue;
+            const Vec3 qv = Cross(tv, e1);
+            const float b2 = Dot(d, qv) * inv;
+            if (!(b2 >= -1e-5f && b1 + b2 <= 1.00001f)) continue;
+            const float t = Dot(e2, qv) * inv;
+            if (!(t > 0 && t < best)) continue;
+            best = t;
+            const float* t0 = (const float*)(vb + (size_t)i[0] * stride + ua);
+            const float* t1 = (const float*)(vb + (size_t)i[1] * stride + ua);
+            const float* t2 = (const float*)(vb + (size_t)i[2] * stride + ua);
+            const float b0 = 1.0f - b1 - b2;
+            u = b0 * t0[0] + b1 * t1[0] + b2 * t2[0];
+            v = b0 * t0[1] + b1 * t1[1] + b2 * t2[1];
+            found = 1;
+        }
+        return found && std::isfinite(u) && std::isfinite(v) ? 1 : 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return -1;
+    }
+}
+
+// Pixel of the screen (w x h metres, rx x ry pixels) the ray o + t d (screen space: centre at 0, +x right, +y up,
+// +z towards the viewer) points at. Its mesh first (the screen's bulge); just beside it, or without a usable
+// mesh, the flat rectangle: within 2% of its edges (then on the edge), so the edges are easy to reach. check: the
+// pointing hand's ray - its mesh hits are compared with the flat rectangle's (the bulge moves a pixel by about
+// bulge x tan(angle)): 5 in a row too far apart, and the flat rectangle is used for this sitting.
+bool ScreenRayPixel(BYTE* S, Vec3 o, Vec3 d, float w, float h, int rx, int ry, bool check, float& px, float& py)
+{
+    ScreenState& s = g_scr;
+    if (!std::isfinite(o.x + o.y + o.z) || !std::isfinite(d.x + d.y + d.z)) return false;
+    if (d.z > -0.02f) return false;   // (along the screen, or from behind it)
+    const float t = -o.z / d.z;
+    float fx = 0, fy = 0;
+    const bool flat = t > 0;
+    if (flat) {
+        fx = (o.x + d.x * t) / w + 0.5f;
+        fy = 0.5f - (o.y + d.y * t) / h;
+    }
+    if (s.meshOk == 1) {
+        float u = 0, v = 0;
+        const int m = ScreenMeshHit(S, s, o, d, u, v);
+        if (m == 1) {
+            if (check && flat) {
+                const float tol = 0.03f + 1.2f * s.meshZmax * std::max(std::abs(d.x) / w, std::abs(d.y) / h) / std::abs(d.z);
+                if (std::abs(u - fx) > tol || std::abs(1.0f - v - fy) > tol) {
+                    if (++s.meshMisses >= 5) {
+                        s.meshOk = 0;
+                        Log("Screen: the mesh's pixel (%.0f, %.0f) differs from the flat rectangle's (%.0f, %.0f) - the "
+                            "flat rectangle is used", u * rx, (1.0f - v) * ry, fx * rx, fy * ry);
+                    }
+                } else {
+                    s.meshMisses = 0;
+                }
+            }
+            if (s.meshOk == 1) {
+                px = std::clamp(u, 0.0f, 1.0f) * rx;
+                py = std::clamp(1.0f - v, 0.0f, 1.0f) * ry;
+                ++s.meshHits;
+                return true;
+            }
+        } else if (m < 0) {
+            s.meshOk = 0;
+            Log("Screen: its mesh can no longer be read - the flat rectangle is used");
+        }
+    }
+    if (!flat || !(fx >= -0.02f && fx <= 1.02f && fy >= -0.02f && fy <= 1.02f)) return false;
+    px = std::clamp(fx, 0.0f, 1.0f) * rx;
+    py = std::clamp(fy, 0.0f, 1.0f) * ry;
+    ++s.flatHits;
+    return true;
+}
+
+// Each frame A, with the head's camera of this frame (world; the room's yaw x the left eye's rotation): is the
+// player at an interactive screen? Then which hand points, and where on it.
+void ScreenPointerUpdate(const Pose& cam)
+{
+    ScreenState& s = g_scr;
+    if (!s.ready) return;
+    BYTE* pl = LocalPlayer();
+    BYTE* S = pl ? *(BYTE**)(pl + s.plScreen) : nullptr;
+    // (in VR the view never glides to the screen: see the top of this section; also with screenPointer off)
+    float blendWas = 0;
+    if (S && s.blend && g_gameObj) {
+        float* b = (float*)(g_gameObj + s.blend);
+        blendWas = *b;
+        if (blendWas != 0) *b = 0;
+    }
+    float xf[8] = {};
+    int rx = 0, ry = 0;
+    float w = 0, h = 0;
+    bool used = S && Cfg().screenPointer && *(S + s.enabled) && *(S + s.interactive) && *(BYTE**)(S + s.scrPlayer) == pl;
+    if (used) {
+        rx = *(int*)(S + s.resX);
+        ry = *(int*)(S + s.resY);
+        w = *(float*)(S + s.sizeX);
+        h = *(float*)(S + s.sizeY);
+        used = rx >= 16 && rx <= 16384 && ry >= 16 && ry <= 16384 && w > 0.01f && w < 50 && h > 0.01f && h < 50 &&
+               ScreenTransformGuarded(s.xf, S, xf) && std::isfinite(xf[0] + xf[1] + xf[2] + xf[3] + xf[4] + xf[5] + xf[6]);
+    }
+    const double now = ProfNow();
+    if (!used) {
+        if (s.screen) {
+            Log("Screen: the player left the screen after %.1f s - cursor given %u times, real mouse %u frames, %u "
+                "clicks on it, %u right-eye draws skipped, rays on the mesh %u / on the flat rectangle %u",
+                (now - s.since) / 1000.0, s.written, s.mouseFrames, s.presses, s.skipped, s.meshHits, s.flatHits);
+            s.screen = nullptr;
+        }
+        return;
+    }
+    const int dom = Cfg().leftHanded ? 0 : 1;
+    const bool fresh = g_modUi.rayFrame == g_frameCounter;
+    if (S != s.screen || g_frameCounter - s.frame > 10) {
+        // The player sits down: the dominant hand points, the laser has the cursor. (A trigger already held
+        // counts as a press only once released and pulled again.)
+        s.screen = S;
+        s.since = now;
+        s.lastLog = now;
+        s.hand = dom;
+        for (int i = 0; i < 2; ++i) {
+            s.trigDown[i] = fresh && g_modUi.trigger[i] > 0.35f;
+            s.pend[i] = false;
+        }
+        s.hitPrev = false;
+        s.laserOwns = true;
+        s.laserMoved = s.pressed = s.mouseLast = false;
+        s.mouseTime = -1e9;
+        s.pxFrame = 0;
+        s.written = s.mouseFrames = s.presses = s.skipped = s.meshHits = s.flatHits = s.handChanges = 0;
+        s.blendFound = blendWas;
+        // (its mesh checked again at each sitting)
+        s.meshVb = *(BYTE**)(S + s.vtx);
+        s.meshNv = *(int*)(S + s.vtxCount);
+        s.meshNi = *(uint32_t*)(S + s.idxCount);
+        s.meshOk = ScreenMeshCheck(S, s, w, h, s.meshZmax);
+        s.meshMisses = 0;
+        Log("Screen: the player sits at a screen (%dx%d pixels, %.2f x %.2f m, mesh of %u triangles %s, bulge %.3f m; "
+            "camera glide reset from %.2f) - the %s hand's laser points at it, its trigger clicks; the other hand takes "
+            "the pointer by pulling its trigger on it",
+            rx, ry, w, h, s.meshNi / 3, s.meshOk == 1 ? "used" : "not usable: flat rectangle", s.meshZmax, blendWas,
+            dom ? "right" : "left");
+    } else if (blendWas > 0.05f && s.blendFound <= 0.05f) {
+        s.blendFound = blendWas;
+        Log("Screen: the game's camera glide to the screen was %.2f - reset (the view stays at the head)", blendWas);
+    }
+    s.frame = g_frameCounter;
+    // The rays: room space (recentred) -> world, as main.lua's toWorld, from the left eye (its room pose and its
+    // world camera).
+    const Quat room = AxisAngle({ 0, 1, 0 }, g_anchorYaw * 3.14159265f / 180.0f);
+    const float ws = std::max(0.1f, Cfg().worldScale);
+    const Vec3 sp{ xf[0], xf[1], xf[2] };
+    const Quat sq = Normalize(Quat{ xf[3], xf[4], xf[5], xf[6] });
+    const Quat si = Conjugate(sq);
+    bool hit[2] = {}, press[2] = {};
+    float hx[2] = {}, hy[2] = {};
+    for (int i = 0; i < 2; ++i) {
+        if (fresh && g_modUi.ray[i]) {
+            const Pose& a = g_modUi.aim[i];
+            const Vec3 o = cam.p + Rotate(room, (a.p - g_leftEyePos) * ws);
+            const Vec3 d = Rotate(room, Rotate(a.q, { 0, 0, -1 }));
+            hit[i] = ScreenRayPixel(S, Rotate(si, o - sp), Rotate(si, d), w, h, rx, ry, i == s.hand, hx[i], hy[i]);
+        }
+        // (the same thresholds as the mouse buttons in input.cpp: a press is seen by both at once)
+        if (fresh) {
+            const bool down = s.trigDown[i] ? g_modUi.trigger[i] > 0.35f : g_modUi.trigger[i] > 0.55f;
+            press[i] = down && !s.trigDown[i];
+            s.trigDown[i] = down;
+            if (!down) s.pend[i] = false;
+        }
+    }
+    // The other hand takes the pointer by pulling its trigger with its ray on the screen. While the pointing hand's
+    // trigger is held (a drag, or still being released) or a mod's window takes the triggers, that pull waits: it
+    // takes the pointer as soon as it can, if still held with its ray on the screen (input.cpp then releases the
+    // left button and presses it again for that hand: its click).
+    const bool blocked = (s.trigDown[s.hand] && !press[s.hand]) || EngineModUiShown();
+    const int other = 1 - s.hand;
+    if (press[other] && hit[other] && blocked) s.pend[other] = true;
+    if (!blocked && !(press[s.hand] && hit[s.hand]) && (press[other] || (s.pend[other] && s.trigDown[other])) && hit[other]) {
+        s.hand = other;
+        s.pend[other] = false;
+        s.pressed = true;
+        ++s.presses;
+        s.hitPrev = false;
+        if (++s.handChanges <= 20)
+            Log("Screen: pointer -> %s hand (its trigger pulled on the screen)", other ? "right" : "left");
+    } else if (press[s.hand] && hit[s.hand]) {
+        s.pressed = true;
+        ++s.presses;
+    }
+    if (hit[s.hand]) {
+        s.px = hx[s.hand];
+        s.py = hy[s.hand];
+        s.pxFrame = g_frameCounter;
+        // (the laser takes the cursor back from a resting mouse by a deliberate motion: 24 pixels within 0.25 s)
+        if (!s.hitPrev || now - s.refT >= 250.0) {
+            s.refX = s.px;
+            s.refY = s.py;
+            s.refT = now;
+        } else if (std::abs(s.px - s.refX) + std::abs(s.py - s.refY) >= 24 && now - s.mouseTime > 750.0) {
+            s.laserMoved = true;
+        }
+    }
+    s.hitPrev = hit[s.hand];
+    g_scrHand = s.hand;
+    g_scrRayOn[0] = hit[0];
+    g_scrRayOn[1] = hit[1];
+    g_scrShownFrame = g_frameCounter;
+    if (now - s.lastLog >= 10000.0) {
+        s.lastLog = now;
+        Log("Screen: pointer %s hand at %.0f, %.0f, rays on the screen L%d R%d, cursor %s (given %u times, real mouse "
+            "%u frames), %u clicks, %u right-eye draws skipped",
+            s.hand ? "right" : "left", s.px, s.py, hit[0] ? 1 : 0, hit[1] ? 1 : 0, s.laserOwns ? "laser" : "mouse",
+            s.written, s.mouseFrames, s.presses, s.skipped);
+    }
+}
+
+void InitScreens()
+{
+    ScreenState& s = g_scr;
+    // Screen::update, from its first lines: mov r14,rcx ; mov rax,[rcx+script] ; mov rcx,[rax+ui] ; test rcx,rcx ;
+    // je ; mov [rcx+screen],r14 ; cmp byte [r14+enabled],0 ; je ; cmp byte [r14+interactive],0 ; je ;
+    // cmp qword [r14+player],0 ; je ; mov rcx,r14 ; call cursorX ; mov edi,eax ; mov rcx,r14 ; call cursorY ;
+    // mov esi,eax ; lea r13,[r14+input] ; mov rdx,[r14+player] ; add rdx,playerInput ; mov rcx,r13 ; call copy
+    BYTE* head = Scan("4C 8B F1 48 8B 81 ?? ?? 00 00 48 8B 88 ?? ?? 00 00 48 85 C9 74 ?? 4C 89 B1 ?? ?? 00 00 41 80 BE ?? ?? "
+                      "00 00 00 0F 84 ?? ?? 00 00 41 80 BE ?? ?? 00 00 00 0F 84 ?? ?? 00 00 49 83 BE ?? ?? 00 00 00 0F 84 "
+                      "?? ?? 00 00 49 8B CE E8 ?? ?? ?? ?? 8B F8 49 8B CE E8 ?? ?? ?? ?? 8B F0 4D 8D AE ?? ?? 00 00 49 8B "
+                      "96 ?? ?? 00 00 48 81 C2 ?? ?? 00 00 49 8B CD E8");
+    // ... mov r15,[r14+player] ; add r15,playerInput ; mov dword [rbp+X],4 ; mov ebx,[r14+resX] ; mov rcx,r15 ;
+    // call deltaX ; (clamp) ; mov ebx,[r14+resY] ; mov rcx,r15 ; call deltaY ; (clamp) ; cmp dword [r15+device],3 ; jne
+    BYTE* clamp = Scan("4D 8B BE ?? ?? 00 00 49 81 C7 ?? ?? 00 00 C7 45 ?? 04 00 00 00 41 8B 5E ?? 49 8B CF E8 ?? ?? ?? ?? 8D "
+                       "0C 38 45 33 E4 41 8B C4 85 C9 0F 4F C1 3B C3 0F 4C D8 89 5D ?? 41 8B 5E ?? 49 8B CF E8 ?? ?? ?? ?? 8D "
+                       "0C 30 41 8B C4 85 C9 0F 4F C1 3B C3 0F 4C D8 89 5D ?? 41 83 BF ?? ?? 00 00 03 0F 85");
+    // The touch hit test's start: lea rdx,[rbp+X] ; mov rcx,r14 ; call transform ; cmp dword [r14+vertexCount],0 ; jbe
+    BYTE* tr = Scan("48 8D 55 ?? 49 8B CE E8 ?? ?? ?? ?? 41 83 BE ?? ?? 00 00 00 0F 86 ?? ?? 00 00");
+    // Its vertex loop: mov ecx,r12d ; imul ecx,[r14+stride] ; add rcx,[r14+vertices] ; movzx edx,word [r14+position]
+    BYTE* vl = Scan("41 8B CC 41 0F AF 8E ?? ?? 00 00 49 03 8E ?? ?? 00 00 41 0F B7 96 ?? ?? 00 00");
+    // Its triangle loop (+467900): mov rax,[r15] ; cmp ebx,[rax+indexCount] ; jae ; mov rsi,[rax+indices]
+    BYTE* il = Scan("49 8B 07 3B 98 ?? ?? 00 00 0F 83 ?? ?? 00 00 48 8B B0 ?? ?? 00 00");
+    // ... mov r10,[r15] ; mov r8,[r10+vertices] ; movzx edx,word [r10+uv] ; mov r9d,[r10+stride]
+    BYTE* uv = Scan("4D 8B 17 4D 8B 82 ?? ?? 00 00 41 0F B7 92 ?? ?? 00 00 45 8B 8A ?? ?? 00 00");
+    // ... its flat fallback: movss xmm0,[rax+sizeX] ; lea r8,[rbp+X] ; xorps xmm0,[sign] / movss xmm0,[rax+sizeY] ;
+    // mulss xmm0,xmm6 ; movss [rbp+X],xmm0
+    BYTE* sx = Scan("F3 0F 10 40 ?? 4C 8D 45 ?? 0F 57 05");
+    BYTE* sy = Scan("F3 0F 10 40 ?? F3 0F 59 C6 F3 0F 11 45");
+    // The cursor event: lea rdx,[rbp+X] ; mov rcx,r13 ; call Input::handleEvent ; cmp byte [r14+X],0 ; je ; cmp byte
+    BYTE* ce = Scan("48 8D 55 ?? 49 8B CD E8 ?? ?? ?? ?? 41 80 BE ?? ?? 00 00 00 74 ?? 41 80 BE");
+    // Screen::render: (prologue) ; mov r13,rcx ; xor r12d,r12d ; mov r15d,r12d ; mov [rbp+50h],r12d ;
+    // cmp byte [rcx+enabled],r12b
+    BYTE* rd = Scan("40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 F8 48 81 EC 08 01 00 00 0F 29 B4 24 F0 00 00 00 4C "
+                    "8B E9 45 33 E4 45 8B FC 44 89 65 50 44 38 A1 ?? ?? 00 00");
+    // Game::frame, the camera's glide to the screen in use: addss xmm0,[r12+blend] ; minss xmm0,xmm8 ;
+    // movss [r12+blend],xmm0 ; jmp
+    BYTE* bl = Scan("F3 41 0F 58 84 24 ?? ?? 00 00 F3 41 0F 5D C0 F3 41 0F 11 84 24 ?? ?? 00 00 EB");
+    // The renderer's screen draw (+8e046), the transform it draws the screen's mesh with: lea rdx,[rsp+X] ;
+    // mov rcx,r14 ; call transform ; mov rdx,rax ; lea rcx,[rbp+X] ; call
+    BYTE* dxs = Scan("48 8D 54 24 ?? 49 8B CE E8 ?? ?? ?? ?? 48 8B D0 48 8D 4D ?? E8");
+    BYTE* getter = head ? RelTarget(head + 0x4F, head + 0x4B) : nullptr;
+    BYTE* dx = clamp ? RelTarget(clamp + 0x21, clamp + 0x1D) : nullptr;
+    BYTE* dy = clamp ? RelTarget(clamp + 0x43, clamp + 0x3F) : nullptr;
+    BYTE* ev = ce ? RelTarget(ce + 12, ce + 8) : nullptr;
+    auto inText = [](BYTE* p, size_t n) { return p && p >= g_text && p + n <= g_text + g_textSize; };
+    // The cursor X getter: mov r8,[g_game] ; movsxd rdx,dword [r8+playerIndex] ; mov rax,[r8+players] ;
+    // mov rdx,[rax+rdx*8] ; cmp [rdx+screen],rcx ; je. Mouse motion getters: mov eax,[rcx+delta] ; ret.
+    // Input::handleEvent: push rbp ; push rbx ; mov rbp,rsp ; sub rsp,48h ; mov eax,[rdx] ; ...
+    const bool ok =
+        head && clamp && tr && vl && il && uv && sx && sy && ce && inText(getter, 0x40) && inText(dx, 8) && inText(dy, 8) &&
+        inText(ev, 0x20) &&
+        ScanIn(getter, 0x24, "4C 8B 05 ?? ?? ?? ?? 49 63 90 ?? ?? 00 00 49 8B 80 ?? ?? 00 00 48 8B 14 D0 48 39 8A ?? ?? 00 00 74") == getter &&
+        U32(getter + 10) == g_offPlayerIndex && U32(getter + 17) == g_offPlayerList && g_offPlayerList &&
+        ScanIn(dx, 7, "8B 81 ?? ?? 00 00 C3") == dx && ScanIn(dy, 7, "8B 81 ?? ?? 00 00 C3") == dy &&
+        ScanIn(ev, 0x16, "40 55 53 48 8B EC 48 83 EC 48 8B 02 48 8B D9 85 C0 75 0E 8B 52 04") == ev &&
+        U32(head + 0x3C) == U32(clamp + 3) && U32(head + 0x6C) == U32(clamp + 10) &&   // (player, its input: both places)
+        U32(vl + 14) == U32(uv + 6) && U32(vl + 7) == U32(uv + 21) &&                    // (vertices, stride: both places)
+        U32(head + 0x5E) < 0x1000 && U32(head + 0x6C) < 0x4000;
+    if (!ok) {
+        Log("Engine: the game's computer screens not recognised (%p %p %p %p %p %p %p %p %p, getter %p) - the controllers "
+            "cannot point at them", head, clamp, tr, vl, il, uv, sx, sy, ce, getter);
+    } else {
+        s.plScreen = U32(getter + 0x1C);
+        s.scrPlayer = U32(head + 0x3C);
+        s.scrInput = U32(head + 0x5E);
+        s.plInput = U32(head + 0x6C);
+        s.enabled = U32(head + 0x20);
+        s.interactive = U32(head + 0x2E);
+        s.resX = clamp[0x18];
+        s.resY = clamp[0x3A];
+        s.sizeX = sx[4];
+        s.sizeY = sy[4];
+        s.deltaX = U32(dx + 2);
+        s.deltaY = U32(dy + 2);
+        s.device = U32(clamp + 0x59);
+        s.vtxCount = U32(tr + 15);
+        s.stride = U32(vl + 7);
+        s.vtx = U32(vl + 14);
+        s.posAttr = U32(vl + 22);
+        s.uvAttr = U32(uv + 14);
+        s.idxCount = U32(il + 5);
+        s.idx = U32(il + 18);
+        s.cursorRet = ce + 12;
+        // The screen's world transform: the one the renderer draws its mesh with (+4682c0, from +8e046), else the one
+        // the touch hit test uses (+4683b0, Screen::update; they differ only for a moving screen). Either must be the
+        // function its pattern matches: screen's parent shape, its transform, x the screen's own.
+        const char* xfPat = "48 89 5C 24 08 57 48 83 EC 40 48 8B FA 48 8B D9 BA 02 00 00 00 E8 ?? ?? ?? ?? 48 85 C0 74 ?? 48 8D "
+                            "54 24 20 48 8B C8 E8 ?? ?? ?? ?? 4C 8D 43";
+        BYTE* drawXf = dxs ? RelTarget(dxs + 13, dxs + 9) : nullptr;
+        BYTE* xf = inText(drawXf, 0x30) && ScanIn(drawXf, 0x30, xfPat) == drawXf ? drawXf : RelTarget(tr + 12, tr + 8);
+        if (inText(xf, 0x30) && ScanIn(xf, 0x30, xfPat) == xf &&
+            HookFunction(ev, (void*)Hook_ScreenCursor, (void**)&Real_InputEvent)) {
+            s.xf = (PFN_ScreenXf)xf;
+            s.ready = true;
+        }
+        if (bl && U32(bl + 6) == U32(bl + 0x15) && U32(bl + 6) < 0x10000) s.blend = U32(bl + 6);
+        else Log("Engine: the game's camera glide to a screen not recognised (%p) - in VR it may still glide there", bl);
+        Log("Engine: the game's computer screens %s (cursor event +%llx from +%llx, transform +%llx; player screen +%x, "
+            "screen player +%x, input +%x, player input +%x, enabled +%x / +%x, resolution +%x / +%x, size +%x / +%x, mesh "
+            "+%x stride +%x position +%x uv +%x vertices +%x indices +%x / +%x, mouse motion +%x / +%x, device +%x; camera "
+            "glide game+%x)",
+            s.ready ? "pointed at with the controllers" : "NOT pointed at (transform or hook)", (unsigned long long)(ev - g_base),
+            (unsigned long long)((BYTE*)s.cursorRet - g_base), (unsigned long long)(xf - g_base), s.plScreen, s.scrPlayer,
+            s.scrInput, s.plInput, s.enabled, s.interactive, s.resX, s.resY, s.sizeX, s.sizeY, s.vtx, s.stride, s.posAttr,
+            s.uvAttr, s.vtxCount, s.idx, s.idxCount, s.deltaX, s.deltaY, s.device, s.blend);
+    }
+    // Drawn once per stereo pair: needs only the player's screen (its getter) - also without the pointer.
+    if (ok && rd && U32(rd + 0x31) == s.enabled && HookFunction(rd, (void*)Hook_ScreenRender, (void**)&Real_ScreenRender)) {
+        s.renderHooked = true;
+        Log("Engine: the screen the player uses is drawn once per stereo pair (+%llx; [Controles] screenOncePerPair=%d)",
+            (unsigned long long)(rd - g_base), Cfg().screenOncePerPair ? 1 : 0);
+    } else {
+        Log("Engine: Screen::render not recognised (%p) - with frameBMode 2 a click on the game's computer may count twice", rd);
+    }
 }
 
 void InitCameraHook()
@@ -8384,6 +8947,7 @@ bool EngineInit()
     InitOffArm();
     InitDualWield();   // (after InitAimCamera and InitOffArm: GetCameraTransform's trampoline, the handle lookup)
     InitGrabDistance();   // (after InitPlayerYaw: the local player)
+    InitScreens();        // (after InitPlayerYaw: the local player)
     InitPerfTrace();   // ([Debug] perfTrace only: nothing searched nor hooked otherwise)
     InitLazyBegin();   // ([Performance] lazyBeginFrame only: nothing searched nor hooked otherwise)
     InitPauseWide();   // (after InitUiCamera: the UI camera it changes)
@@ -8544,6 +9108,16 @@ void EngineSetUiRays(const Pose& leftAim, bool leftOk, float leftTrigger, const 
 bool EngineModUiShown() { return g_modUi.pair && g_frameCounter - g_modUi.pairFrame <= 2; }
 
 int EngineModUiHand() { return EngineModUiShown() ? g_modUi.hand : -1; }
+
+bool EngineScreenShown()
+{
+    const uint64_t f = g_scrShownFrame.load();
+    return g_scr.ready && f && g_frameCounter - f <= 2;
+}
+
+int EngineScreenHand() { return EngineScreenShown() ? g_scrHand.load() : -1; }
+
+bool EngineScreenRayOn(int hand) { return EngineScreenShown() && (hand == 0 || hand == 1) && g_scrRayOn[hand].load(); }
 
 bool EngineModUiOnWindow(int hand)
 {

@@ -784,6 +784,19 @@ void TabControls()
             "Avec le laser de la main gauche, son grip déplace aussi nos panneaux\n"
             "(inventaire, réglages, touches) quand elle les vise.\n"
             "Décoché : seulement la main qui tient l'outil."));
+    Check(Tr("In-game computer with the controllers", "Ordinateur du jeu à la manette"), &s.screenPointer);
+    Help(Tr("At an in-game computer (the campaign's mission computer: Y to sit at it),\n"
+            "the laser moves its cursor and the trigger clicks. At first the hand\n"
+            "holding the tool points; pull the other hand's trigger while aiming at\n"
+            "the screen to point with it (that click already counts). Meanwhile the\n"
+            "left trigger no longer makes you crouch. The real mouse still works.\n"
+            "Y leaves the computer.",
+            "Devant un ordinateur du jeu (l'ordinateur des missions de la campagne :\n"
+            "Y pour s'y installer), le laser déplace son curseur et la gâchette clique.\n"
+            "Au début c'est la main qui tient l'outil qui pointe ; tire la gâchette de\n"
+            "l'autre main en visant l'écran pour pointer avec elle (ce clic compte déjà).\n"
+            "Pendant ce temps la gâchette gauche ne fait plus s'accroupir. La vraie\n"
+            "souris marche toujours. Y pour quitter l'ordinateur."));
     Check(Tr("Left hand laser", "Laser de la main gauche"), &s.offLaser);
     Help(Tr("A laser also comes out of your left hand (the right one in left-handed\n"
             "mode), like the one of the hand holding the tool. On a menu (settings,\n"

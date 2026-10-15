@@ -16,6 +16,9 @@ Link. SteamVR can also be selected.
 > can stop working altogether. No fix or update is promised. See
 > [docs/UPDATING_FOR_A_NEW_GAME_VERSION.md](docs/UPDATING_FOR_A_NEW_GAME_VERSION.md).
 
+**Latest update (2026-10-15):** the campaign's mission computer now works in VR (clicks, and a cursor moved by the
+controllers' lasers), and the view no longer shakes when a wrist turns. See [CHANGELOG.md](CHANGELOG.md).
+
 ## Features
 
 - **Synchronised stereo**: both eyes show the same game instant. Each eye renders the headset's own asymmetric
@@ -32,6 +35,8 @@ Link. SteamVR can also be selected.
   aircraft view) work in VR. A keys panel presses their keyboard keys for you. One two-pistol mod can be used
   with both hands (dual wield).
 - **Menus, loading screens and pause** on a virtual screen (16:9 during a paused level).
+- **The game's own computers** (the campaign's mission computer): their cursor follows the controller's laser and
+  the trigger clicks.
 - **A settings panel** in English or French, shown in the game and in the headset (F10, or a long press on the
   left controller's Menu button).
 - **Automatic headset detection** at start: Virtual Desktop, Meta Quest Link or SteamVR.
@@ -107,6 +112,7 @@ the test-only targets, the installer, the release script and installing by hand.
 
 | Document | Contents |
 |---|---|
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each update, with the cause of each fixed bug |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the DLL and the Lua mod are organised, module by module, and the per-frame data flow |
 | [docs/MODDER_GUIDE.md](docs/MODDER_GUIDE.md) | For modders: working on Teardown VR, and how it handles other mods (tools, cameras, windows, keys) |
 | [docs/PROBLEMS_AND_SOLUTIONS.md](docs/PROBLEMS_AND_SOLUTIONS.md) | The problems met while making the mod, their causes and how each one was solved |

@@ -184,6 +184,21 @@ Play Teardown in virtual reality, like a native VR game:
     the zoom type ("Move closer" or "Magnifier", the old mode) is chosen, and
     the zoom turned off, in the settings (Display, "Mod camera zoom").
 
+  IN-GAME COMPUTER (the campaign's mission computer, at the hub)
+    Y to sit at it. The view stays where your head is, with your hands and your
+    lasers (it no longer glides in front of the screen).
+    - The laser of the hand holding the tool moves the computer's cursor; its
+      trigger clicks (choose a place, then a mission).
+    - To point with the other hand: aim at the screen with it and pull its
+      trigger (L2 or R2). That click already counts, where it aims. The other
+      hand takes the pointer back the same way.
+    - A trigger pulled while its laser is beside the screen does not click.
+    - Meanwhile the left trigger no longer makes you crouch.
+    - The real mouse still works: move it and it takes the cursor; aim and
+      click with a controller to take the cursor back.
+    - Y leaves the computer. Settings (Controls): "In-game computer with the
+      controllers" (off: as before).
+
   MOD MENUS WITH THE MOUSE (THE EVERYTHING REVOLVER, Natural Phenomena's
   weather, item spawn menu...)
     When a mod opens a window you use with the mouse, it's shown sharp in front

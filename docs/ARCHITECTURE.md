@@ -635,7 +635,7 @@ return false, no synchronised stereo) -> `Hook_Update` installed -> `InitCameraH
 `InitMapView`, `InitScriptView`, `InitUiCamera`, `InitCrosshairAim`, `InitModUiPointer`, `InitPlayerYaw`,
 `InitAimCamera`, `InitModPanel`, `InitHistoryHook`, `InitParticleHook`, `InitParticleSort`, `InitParticleMotion`,
 `InitShapeJobSkip`, `InitDeadPasses`, `InitSameNoise`, `InitOffArm`, `InitDualWield`, `InitGrabDistance`,
-`InitPerfTrace` (performance hooks and frame-B module), `InitLazyBegin`, `InitPauseWide` -> "Engine: synchronised
+`InitScreens`, `InitPerfTrace` (performance hooks and frame-B module), `InitLazyBegin`, `InitPauseWide` -> "Engine: synchronised
 stereo ready". The order matters: each comment in the code says which earlier result an `Init*` needs.
 
 **Main hooks.**
@@ -652,6 +652,8 @@ stereo ready". The order matters: each comment in the code says which earlier re
 | `Hook_GetPlayerEye` | Lua binding `GetPlayerEyeTransform` | dual wield |
 | `Hook_UiRectVisible`, `Hook_UiWorldToPixel`, `Hook_UiPop`, `Hook_UiMakeInteractive` | `Ui*` bindings and the rectangle visibility test | crosshairs on the laser, mods' windows |
 | `Hook_MousePixel` | the mouse pixel the `Ui*` functions read | VR pointer in mods' windows |
+| `Hook_ScreenRender` | `Screen::render` (`0x467dd0`) | the game's computer screen drawn once per stereo pair |
+| `Hook_ScreenCursor` | `Input::handleEvent` (`0x4f3e30`), only from `Screen::update`'s cursor event | the controllers move a game computer's cursor |
 | `Hook_ScriptDraw`, `Hook_UiClip`, `Hook_UiBackgroundBlur`, `Hook_InputPressed/Down/Released` | script `draw()`, clip, blur, input bindings | mods' menus as room panels |
 | `Hook_Render` | `Renderer::render` (`0x87f40`) | per-eye history, noise, object motion, TAA / particle swaps |
 | `Hook_PsUpdate` | `ParticleSystem::update` | particles simulated in frame A |
@@ -685,6 +687,7 @@ Plus the performance hooks ([5.9](#59-measurement-and-performance)) and the fram
 | Off arm | `OffArmLateFix` | `[Controles] offArm` | the off hand's bodies are placed by Lua for frame A's camera; at render they are moved onto the camera actually drawn |
 | Dual wield | `Hook_GetPlayerEye`, `DualEye` | `[Controles] dualWield` | a two-gun mod tool (profiles `totaloverdose`, `totaloverdose2`) is split between both hands; each shot leaves the gun of the hand that pressed. Turns itself off for the session if the tool behaves unlike its profile. RE §6 octies ["Dual weapons"](REVERSE_ENGINEERING.md#6-octies-dual-weapons-total-overdose) |
 | The game's grab | `InitGrabDistance`, `GrabControls` | `[Controles] grabKeepDistance`, `grabMinDistance`, `grabStickSpeed` | three rip-relative operands (the 0.2 m pull and two 1.5 m minimums) are redirected to two floats allocated near the image; in VR the object stays at the distance it was taken and the stick moves it. RE §7 ter ["The game's grab"](REVERSE_ENGINEERING.md#7-ter-the-games-grab-right-grip) |
+| The game's computer screens | `ScreenPointerUpdate`, `Hook_ScreenCursor`, `Hook_ScreenRender` | `[Controles] screenPointer`, `screenOncePerPair` | seated at an in-world screen (the campaign's mission computer), the pointing hand's ray is intersected with the screen's mesh and its pixel becomes the cursor; the screen is drawn in frame A only (its script read frame A's click twice); the game's camera glide to the screen is kept at 0 in VR. RE §7 quinquies ["The game's in-world screens"](REVERSE_ENGINEERING.md#7-quinquies-the-games-in-world-screens-the-campaigns-computer) |
 | 16:9 pause screen | `WideDecide`, `Hook_CamSet` | `[Ecran] pauseWide` | a paused level (no script ticks) is drawn on a 1920 x 1080 canvas with a 16:9 3D view for the virtual screen |
 | Player yaw | `EngineSetPlayerYaw` | - | writes the local player's yaw field directly (the Lua API sets yaw only with position, which shook camera and tool) |
 
@@ -798,7 +801,8 @@ quater ["Active window and held buttons"](REVERSE_ENGINEERING.md#7-quater-active
   grips; pulses last 0.12 s so the game sees them over several frames.
 - **Special behaviours.** Light-pull sledge strikes (`sledgeTap`); one click per trigger press for dual wield; stick
   as mouse while a mod owns the camera (`[Mods] modMouse`); grabbed objects moved with the stick
-  (`grabKeepDistance`); pointer hand selection (`offHandPointer`).
+  (`grabKeepDistance`); pointer hand selection (`offHandPointer`); at a game computer screen
+  (`EngineScreenShown`), the pointing hand's trigger is the left mouse button and the left trigger does not crouch.
 - **PcKeys.** The keys the mod can press, named as Teardown's input API, each with a US virtual key and scan code and
   bilingual labels.
 - **ModKeys.** Finds the keys used by the *active* mods without their help, on a background thread: active mods from

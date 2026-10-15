@@ -113,6 +113,7 @@ patterns again after a game update.
 * [7 bis. Free-hand arm, pointing hand](#7-bis-free-hand-arm-pointing-hand)
 * [7 ter. The game's grab (right grip)](#7-ter-the-games-grab-right-grip)
 * [7 quater. Active window and held buttons](#7-quater-active-window-and-held-buttons)
+* [7 quinquies. The game's in-world screens (the campaign's computer)](#7-quinquies-the-games-in-world-screens-the-campaigns-computer)
 * [8. Other landmarks (2.0.1)](#8-other-landmarks-201)
 * [9. Tools](#9-tools)
 
@@ -2001,7 +2002,7 @@ on a real headset, then 1.
   into `game+0x860`, which `Game::frame` copies to `+0x868` and then resets to 0
   every frame; `game.cursor.enabled` = `+0x1e9` follows one frame late). The
   mouse of the `Ui*` functions: `MousePixel` 0x4f27a0
-  (`(input, float out[2])`: position `+0x408/+0x40c` + offset `+0x3f4/+0x3f8`
+  (`(input, float out[2])`: position `+0x3f4/+0x3f8` + offset `+0x408/+0x40c`
   of the script's input copy `script+0x428`, global input `*(game+0x38)`),
   un-projected by the frame's UI camera (0x5ebb00). Eight calls in the block of
   `Ui*` bindings (UiGetMousePos, UiIsMouseInRect, UiGetCanvasMousePos,
@@ -2716,6 +2717,45 @@ section uses 2.0.1; that version label has not been re-checked.
   keyboard).
   `GetForegroundWindow` is used by the game only to bring itself to the front
   and to open a link.
+
+## 7 quinquies. The game's in-world screens (the campaign's computer)
+
+Static analysis of 2.0.1, checked by independent review passes; addresses = RVAs. Used by `InitScreens`,
+`ScreenPointerUpdate`, `Hook_ScreenCursor` and `Hook_ScreenRender` (`engine.cpp`); every offset below is read from
+the patterns at run time and cross-checked.
+
+* A screen entity (`<screen>` in a level: size, bulge, resolution, script, tags `interactive`, `nocam`,
+  `nocursor`, `noidlecursor`) runs a UI script into its own texture. The hub's mission computer: 0.90 x 0.50 m,
+  bulge 0.03, 1920 x 1080, script `ui/terminal.lua` (version 1, all logic in `draw()`); hub_carib's: 0.70 x 0.40,
+  no bulge.
+* Fields: enabled `+0xb8`, interactive `+0xb9`, size (floats) `+0x64/+0x68`, resolution (ints) `+0x70/+0x74`,
+  local transform `+0x48` (pos, quat), input `+0xd0` (an `Input`), player using it `+0x2258`, script `+0x2250`.
+  Mesh: vertices `+0x24f0`, stride `+0x24e4`, position attribute offset (word) `+0x2286`, UV offset (word)
+  `+0x22d6`, vertex count `+0x2508`, int32 indices `+0x2518`, index count `+0x2520`. The mesh is a 32 x 16 grid
+  built at `0x468950`: x = (u - 0.5) w, y = (v - 0.5) h, z = bulge (1 - 2x²/w² - 2y²/h²), in the screen's own
+  space (+z towards the viewer).
+* World transform: `0x4682c0(screen, out)` (the one the renderer draws the mesh with, called at `0x8e046`) and
+  `0x4683b0` (the touch hit test's; they differ only for a moving screen). Both: the parent shape's transform x
+  the screen's local one.
+* Sitting down: `Player::setScreen` `0xc1a50` (Lua `SetPlayerScreen`, from `data/script/terminal.lua` on Interact):
+  player `+0x9a0` = the screen, screen `+0x2258` = the player. While it is set, the player's own controls get the
+  global empty input (`0xc2612`-`0xc2628`).
+* Camera glide: every frame `Game::frame` (`0x72eb7`-`0x72f59`) raises `game+0x358` by 1.2/s while the local
+  player uses a screen without `nocam`, and lowers it by 2.4/s when none is used. With `nocam` it does neither
+  (`0x72f06`): the tag freezes the glide. The camera update (`0x7b45c`) moves the camera toward `game+0x35c` (a
+  point in front of the screen) by e = 0.5 - 0.5 cos(pi x glide), and the renderer draws the used screen again,
+  sharp, with alpha = glide (`0x89aed`).
+* `Screen::update` `0x4695d0` (from `Scene::update`, in `Game::update`): reads the cursor (`0x468330` /
+  `0x468370`), copies the player's input (`player+0xae0`) into the screen's (`0x46966b`), resets the input offset,
+  then cursor = clamp(cursor + raw mouse motion (`+0x3fc/+0x400`), 0, resolution) given as the event
+  `{4, 0, x, y}` to `Input::handleEvent` `0x4f3e30` at `0x469a48` (return address `0x469a4d`; the touch path ends
+  at the same call). The event type 4 writes the position `+0x3f4/+0x3f8`; the cursor read is position + offset
+  (`+0x408/+0x40c`, set to 0 here). Last input device `+0x121c` (3 = touch).
+* `Screen::render` `0x467dd0` (from the screens loop `0xeb160` in `Game::render`, for every screen not tagged
+  `disabled`, not while paused): binds the screen's frame buffer, runs the script's `draw()`, then draws the cursor
+  sprite at the input position. It runs in both frames of a stereo pair; it writes nothing into the screen object.
+* Engine touch hit test `0x467900`: projects the mesh, finds the triangle under the touch, interpolates its UV:
+  pixel = (u x width, (1 - v) x height).
 
 ## 8. Other landmarks (2.0.1)
 
