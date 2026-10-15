@@ -5,6 +5,7 @@
 #     (GitHub turns the spaces of a release file's name into dots, so the published names have none; the files
 #     inside the zip keep their names.)
 #   - SHA-256 checksums of every released file (SHA256SUMS.txt, also in the release notes);
+#   - the latest section of CHANGELOG.md at the top of the release notes ("What's new");
 #   - a build provenance attestation: anyone can check that a file was built by this workflow from this repository
 #     ("gh attestation verify <file> --repo <owner>/<repository>");
 #   - VirusTotal links, when the repository has a VT_API_KEY secret (a free VirusTotal account's API key): the
@@ -70,6 +71,29 @@ jobs:
           retention-days: 7
           overwrite: true
 
+      - name: The latest changes, for the release notes
+        shell: pwsh
+        run: |
+          # (CHANGELOG.md's first "## " section; its links are relative to the repository, so they become links to
+          #  this tag's files)
+          New-Item -ItemType Directory notes | Out-Null
+          $text = if (Test-Path CHANGELOG.md) { Get-Content CHANGELOG.md -Raw } else { '' }
+          $m = [regex]::Match($text, '(?ms)^## .*?(?=^## |\z)')
+          $section = if ($m.Success) { $m.Value.Trim() } else { '' }
+          $base = "${{ github.server_url }}/${{ github.repository }}/blob/$env:TAG/"
+          $section = $section -replace '\]\((?!https?://|#)', "]($base"
+          [IO.File]::WriteAllText((Join-Path $PWD 'notes\whatsnew.md'), $section)
+          "$($section.Length) characters"
+
+      - name: Hand the release notes to the publish job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: release-notes
+          path: notes/
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
   publish:
     needs: build
     runs-on: windows-2022
@@ -85,6 +109,12 @@ jobs:
         with:
           name: release-files
           path: release
+
+      - name: Get the release notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2
+        with:
+          name: release-notes
+          path: notes
 
       - name: SHA-256 checksums
         shell: pwsh
@@ -129,8 +159,12 @@ jobs:
           $sums = (Get-Content release\SHA256SUMS.txt -Raw).TrimEnd()
           $vt = if (Test-Path virustotal.txt) { Get-Content virustotal.txt -Raw } else { "Not uploaded automatically for this release. You can upload the files yourself on https://www.virustotal.com or search their SHA-256 there." }
           $repo = "${{ github.repository }}"
+          $whatsnew = if (Test-Path notes\whatsnew.md) { (Get-Content notes\whatsnew.md -Raw).Trim() } else { '' }
+          if ($whatsnew) { $whatsnew = "### What's new`n`n" + ($whatsnew -replace '(?m)^(#+) ', '$1## ') }
           $notes = @"
           Teardown VR $env:TAG, built automatically by GitHub Actions from commit ${{ github.sha }} of this repository.
+
+          $whatsnew
 
           This build is made from the public source only, **without the game-derived shaders**: the stereo particles fix and the VR anti-aliasing modes are not in it (the game's own shaders are used). Everything else is the same mod.
 
